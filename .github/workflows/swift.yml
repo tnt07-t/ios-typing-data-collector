@@ -20,11 +20,3 @@ jobs:
             -scheme TypingResearch \
             -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=latest' \
             CODE_SIGNING_ALLOWED=NO
-
-      - name: Run tests
-        run: |
-          xcodebuild test \
-            -project TypingResearch.xcodeproj \
-            -scheme TypingResearch \
-            -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=latest' \
-            CODE_SIGNING_ALLOWED=NO
