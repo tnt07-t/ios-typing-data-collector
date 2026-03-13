@@ -2,6 +2,31 @@ import Foundation
 import SwiftData
 import Observation
 
+// MARK: - TapInfo
+
+struct TapInfo {
+    let keyLabel: String
+    let tapLocalX: Double
+    let tapLocalY: Double
+    let keyScreenX: Double
+    let keyScreenY: Double
+    let keyWidth: Double
+    let keyHeight: Double
+
+    var tapNormX: Double { keyWidth > 0 ? tapLocalX / keyWidth : 0 }
+    var tapNormY: Double { keyHeight > 0 ? tapLocalY / keyHeight : 0 }
+
+    static let none = TapInfo(
+        keyLabel: "",
+        tapLocalX: 0,
+        tapLocalY: 0,
+        keyScreenX: 0,
+        keyScreenY: 0,
+        keyWidth: 0,
+        keyHeight: 0
+    )
+}
+
 // MARK: - InputEventData (transient, not SwiftData)
 
 struct InputEventData {
@@ -18,6 +43,15 @@ struct InputEventData {
     let actualChar: String
     let isCorrect: Bool
     let interKeyIntervalMs: Double
+    let tapLocalX: Double
+    let tapLocalY: Double
+    let tapNormX: Double
+    let tapNormY: Double
+    let keyLabel: String
+    let keyScreenX: Double
+    let keyScreenY: Double
+    let keyWidth: Double
+    let keyHeight: Double
 }
 
 // MARK: - SessionManager
@@ -30,6 +64,8 @@ final class SessionManager {
     var currentTrial: Trial?
     var currentTrialIndex: Int = 0
     var pendingEvents: [InputEventData] = []
+    // All events across the session, kept for export
+    var allEvents: [InputEventData] = []
     var isSessionActive: Bool = false
     var isTrialActive: Bool = false
     var isSessionComplete: Bool = false
@@ -77,6 +113,7 @@ final class SessionManager {
         completedTrials = []
         currentTrialIndex = 0
         timerStarted = false
+        allEvents = []
 
         // Timer starts on first keypress, not here
         startNextTrial()
@@ -139,6 +176,7 @@ final class SessionManager {
         }
 
         pendingEvents.append(data)
+        allEvents.append(data)
 
         liveTypedText = data.textAfter
 
@@ -168,7 +206,16 @@ final class SessionManager {
             expectedChar: data.expectedChar,
             actualChar: data.actualChar,
             isCorrect: data.isCorrect,
-            interKeyIntervalMs: data.interKeyIntervalMs
+            interKeyIntervalMs: data.interKeyIntervalMs,
+            tapLocalX: data.tapLocalX,
+            tapLocalY: data.tapLocalY,
+            tapNormX: data.tapNormX,
+            tapNormY: data.tapNormY,
+            keyLabel: data.keyLabel,
+            keyScreenX: data.keyScreenX,
+            keyScreenY: data.keyScreenY,
+            keyWidth: data.keyWidth,
+            keyHeight: data.keyHeight
         )
         modelContext?.insert(event)
     }
@@ -180,6 +227,26 @@ final class SessionManager {
         rangeStart: Int,
         rangeLength: Int,
         eventType: InputEventType
+    ) -> InputEventData {
+        return buildKeyboardEventData(
+            textBefore: textBefore,
+            textAfter: textAfter,
+            replacementString: replacementString,
+            rangeStart: rangeStart,
+            rangeLength: rangeLength,
+            eventType: eventType,
+            tapInfo: .none
+        )
+    }
+
+    func buildKeyboardEventData(
+        textBefore: String,
+        textAfter: String,
+        replacementString: String,
+        rangeStart: Int,
+        rangeLength: Int,
+        eventType: InputEventType,
+        tapInfo: TapInfo
     ) -> InputEventData {
         guard let trial = currentTrial else {
             fatalError("No active trial")
@@ -225,7 +292,16 @@ final class SessionManager {
             expectedChar: expectedChar,
             actualChar: actualChar,
             isCorrect: isCorrect,
-            interKeyIntervalMs: iki
+            interKeyIntervalMs: iki,
+            tapLocalX: tapInfo.tapLocalX,
+            tapLocalY: tapInfo.tapLocalY,
+            tapNormX: tapInfo.tapNormX,
+            tapNormY: tapInfo.tapNormY,
+            keyLabel: tapInfo.keyLabel,
+            keyScreenX: tapInfo.keyScreenX,
+            keyScreenY: tapInfo.keyScreenY,
+            keyWidth: tapInfo.keyWidth,
+            keyHeight: tapInfo.keyHeight
         )
     }
 

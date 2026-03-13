@@ -20,35 +20,60 @@ struct TrialView: View {
             targetTextView
                 .padding(.horizontal, 16)
 
-            Spacer().frame(height: 32)
-
-            // Logging text field
-            if let trial = sessionManager.currentTrial {
-                LoggingTextField(
-                    text: $typedText,
-                    placeholder: "Type the phrase, then press Return...",
-                    onEvent: { eventData in
-                        sessionManager.logEvent(eventData)
-                    },
-                    buildEventData: { textBefore, textAfter, replacement, rangeStart, rangeLength, eventType in
-                        sessionManager.buildEventData(
-                            textBefore: textBefore,
-                            textAfter: textAfter,
-                            replacementString: replacement,
-                            rangeStart: rangeStart,
-                            rangeLength: rangeLength,
-                            eventType: eventType
-                        )
-                    },
-                )
-                .frame(height: 44)
-                .padding(.horizontal, 16)
-                .id(trial.id)
-            }
-
             Spacer()
+
+            // Custom inline QWERTY keyboard
+            CustomKeyboardView { key, tapInfo in
+                handleKeyTap(key: key, tapInfo: tapInfo)
+            }
+            .frame(height: 230)
         }
         .padding(.top, 16)
+    }
+
+    // MARK: - Key Tap Handler
+
+    private func handleKeyTap(key: String, tapInfo: TapInfo) {
+        let textBefore = typedText
+        let textAfter: String
+        let replacementString: String
+        let eventType: InputEventType
+        let rangeStart: Int
+        let rangeLength: Int
+
+        switch key {
+        case "delete":
+            guard !textBefore.isEmpty else { return }
+            textAfter = String(textBefore.dropLast())
+            replacementString = ""
+            eventType = .delete
+            rangeStart = textAfter.count
+            rangeLength = 1
+        case "space":
+            textAfter = textBefore + " "
+            replacementString = " "
+            eventType = .insert
+            rangeStart = textBefore.count
+            rangeLength = 0
+        default:
+            textAfter = textBefore + key
+            replacementString = key
+            eventType = .insert
+            rangeStart = textBefore.count
+            rangeLength = 0
+        }
+
+        let eventData = sessionManager.buildKeyboardEventData(
+            textBefore: textBefore,
+            textAfter: textAfter,
+            replacementString: replacementString,
+            rangeStart: rangeStart,
+            rangeLength: rangeLength,
+            eventType: eventType,
+            tapInfo: tapInfo
+        )
+        sessionManager.logEvent(eventData)
+        typedText = textAfter
     }
 
     // MARK: - Top Bar
@@ -56,10 +81,12 @@ struct TrialView: View {
     private var topBar: some View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Phrase #\(sessionManager.currentTrialIndex + 1)")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Text("\(sessionManager.completedTrials.count) completed")
+                Text(sessionManager.formattedRemaining)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(sessionManager.remainingSeconds < 30 ? .red : .primary)
+                    .monospacedDigit()
+                Text("\(sessionManager.completedTrials.count) phrases completed")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -67,12 +94,12 @@ struct TrialView: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text(sessionManager.formattedRemaining)
+                Text(String(format: "%.0f WPM", sessionManager.liveWPM))
                     .font(.title3)
                     .fontWeight(.semibold)
-                    .foregroundColor(sessionManager.remainingSeconds < 30 ? .red : .primary)
+                    .foregroundColor(.secondary)
                     .monospacedDigit()
-                Text(String(format: "%.0f WPM", sessionManager.liveWPM))
+                Text("live speed")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -130,7 +157,6 @@ struct TrialView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .onChange(of: typedText) { _, _ in
-                        // Keep cursor centered in the scroll view
                         if cursorIndex >= 0 {
                             withAnimation(.easeOut(duration: 0.1)) {
                                 proxy.scrollTo(cursorIndex, anchor: .center)
@@ -152,11 +178,5 @@ struct TrialView: View {
             return typedChars[index] == char ? .green : .red
         }
         return .primary
-    }
-
-    private func handleNext() {
-        sessionManager.submitTrial(finalText: typedText)
-        typedText = ""
-        onTrialComplete()
     }
 }

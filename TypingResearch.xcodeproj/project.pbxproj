@@ -16,6 +16,7 @@
 		AA000000000000000000007 /* LoggingTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000007 /* LoggingTextField.swift */; };
 		AA000000000000000000008 /* DataExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008 /* DataExporter.swift */; };
 		AA000000000000000000009 /* Utilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000009 /* Utilities.swift */; };
+		JJ000000000000000000010 /* CustomKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = JJ000000000000000000011 /* CustomKeyboardView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -29,6 +30,7 @@
 		BB000000000000000000008 /* DataExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000009 /* Utilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utilities.swift; sourceTree = "<group>"; };
 		BB000000000000000000099 /* TypingResearch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TypingResearch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		JJ000000000000000000011 /* CustomKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomKeyboardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -94,6 +96,7 @@
 				BB000000000000000000005 /* SessionView.swift */,
 				BB000000000000000000006 /* TrialView.swift */,
 				BB000000000000000000007 /* LoggingTextField.swift */,
+				JJ000000000000000000011 /* CustomKeyboardView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -191,6 +194,7 @@
 				AA000000000000000000007 /* LoggingTextField.swift in Sources */,
 				AA000000000000000000008 /* DataExporter.swift in Sources */,
 				AA000000000000000000009 /* Utilities.swift in Sources */,
+				JJ000000000000000000010 /* CustomKeyboardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

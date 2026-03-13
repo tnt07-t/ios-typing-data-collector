@@ -149,6 +149,17 @@ final class InputEvent {
     var isCorrect: Bool
     var interKeyIntervalMs: Double
 
+    // Tap coordinate fields (populated by CustomKeyboardView)
+    var tapLocalX: Double      // tap x within key, in points from key left edge
+    var tapLocalY: Double      // tap y within key, in points from key top edge
+    var tapNormX: Double       // tapLocalX / keyWidth (normalized 0-1)
+    var tapNormY: Double       // tapLocalY / keyHeight (normalized 0-1)
+    var keyLabel: String       // "a"-"z", "space", "delete"
+    var keyScreenX: Double     // key origin x on screen (global coords)
+    var keyScreenY: Double     // key origin y on screen (global coords)
+    var keyWidth: Double       // key width in points
+    var keyHeight: Double      // key height in points
+
     init(
         trialId: UUID,
         timestamp: Date,
@@ -162,7 +173,16 @@ final class InputEvent {
         expectedChar: String,
         actualChar: String,
         isCorrect: Bool,
-        interKeyIntervalMs: Double
+        interKeyIntervalMs: Double,
+        tapLocalX: Double = 0.0,
+        tapLocalY: Double = 0.0,
+        tapNormX: Double = 0.0,
+        tapNormY: Double = 0.0,
+        keyLabel: String = "",
+        keyScreenX: Double = 0.0,
+        keyScreenY: Double = 0.0,
+        keyWidth: Double = 0.0,
+        keyHeight: Double = 0.0
     ) {
         self.id = UUID()
         self.trialId = trialId
@@ -178,5 +198,14 @@ final class InputEvent {
         self.actualChar = actualChar
         self.isCorrect = isCorrect
         self.interKeyIntervalMs = interKeyIntervalMs
+        self.tapLocalX = tapLocalX
+        self.tapLocalY = tapLocalY
+        self.tapNormX = tapNormX
+        self.tapNormY = tapNormY
+        self.keyLabel = keyLabel
+        self.keyScreenX = keyScreenX
+        self.keyScreenY = keyScreenY
+        self.keyWidth = keyWidth
+        self.keyHeight = keyHeight
     }
 }

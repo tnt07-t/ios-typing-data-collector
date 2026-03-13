@@ -188,6 +188,15 @@ struct SummaryView: View {
                     .foregroundColor(.primary)
                     .cornerRadius(10)
             }
+
+            Button(action: exportKeystrokes) {
+                Label("Export Keystrokes CSV", systemImage: "keyboard")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color(.systemGray5))
+                    .foregroundColor(.primary)
+                    .cornerRadius(10)
+            }
         }
         .sheet(item: $shareItem) { item in
             ShareSheet(activityItems: [item.url])
@@ -212,6 +221,18 @@ struct SummaryView: View {
         if let url = exporter.exportSessionJSON(
             session: session,
             trials: sessionManager.completedTrials,
+            participant: sessionManager.participant
+        ) {
+            shareItem = ShareItem(url: url)
+        }
+    }
+
+    private func exportKeystrokes() {
+        guard let session = sessionManager.currentSession else { return }
+        let exporter = DataExporter()
+        if let url = exporter.exportKeystrokesCSV(
+            session: session,
+            events: sessionManager.allEvents,
             participant: sessionManager.participant
         ) {
             shareItem = ShareItem(url: url)
