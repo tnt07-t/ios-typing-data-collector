@@ -1,4 +1,26 @@
+# macOS
 .DS_Store
+
+# Xcode build artifacts
+build/
+DerivedData/
+*.xcarchive
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Xcode user state (machine-specific UI layout, breakpoints)
+*.xcuserstate
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# CocoaPods (not used, but just in case)
+Pods/
+
+# Claude / project notes
 CLAUDE.md
 build_log.md
 logs/

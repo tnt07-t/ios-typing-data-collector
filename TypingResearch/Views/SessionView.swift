@@ -58,7 +58,10 @@ struct SummaryView: View {
                 }
             }
             .confirmationDialog("Start a new session?", isPresented: $showResetConfirm, titleVisibility: .visible) {
-                Button("New Session", role: .destructive) {
+                Button("Same participant & duration") {
+                    sessionManager.restartSameSession()
+                }
+                Button("New participant", role: .destructive) {
                     sessionManager.reset()
                 }
                 Button("Cancel", role: .cancel) {}

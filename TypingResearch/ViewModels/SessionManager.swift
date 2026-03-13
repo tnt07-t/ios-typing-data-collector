@@ -71,6 +71,10 @@ final class SessionManager {
     var isSessionComplete: Bool = false
     var completedTrials: [Trial] = []
 
+    // Measured system keyboard height and safe area — set by ParticipantSetupView on first keyboard show
+    var measuredKeyboardHeight: CGFloat = 291   // iPhone 16 default until measured
+    var safeAreaBottom: CGFloat = 34            // iPhone 16 default until measured
+
     // Timer state
     var sessionDurationSeconds: Int = 300   // default 5 minutes
     var remainingSeconds: Int = 0
@@ -368,6 +372,14 @@ final class SessionManager {
     }
 
     // MARK: - Reset
+
+    // Restart immediately with the same participant and duration — stays in session flow
+    func restartSameSession() {
+        guard let existingParticipant = participant else { return }
+        let duration = sessionDurationSeconds
+        reset()
+        startSession(participant: existingParticipant, durationSeconds: duration)
+    }
 
     func reset() {
         sessionTimer?.invalidate()

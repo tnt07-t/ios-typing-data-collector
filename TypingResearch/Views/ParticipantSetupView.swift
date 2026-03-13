@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 
 struct ParticipantSetupView: View {
     @Environment(\.modelContext) private var modelContext
@@ -105,11 +106,21 @@ struct ParticipantSetupView: View {
                         }
                     }
                     .listRowBackground(Color.orange)
-                    .disabled(firstName.trimmingCharacters(in: .whitespaces).isEmpty ||
-                              lastName.trimmingCharacters(in: .whitespaces).isEmpty)
+                    // Name fields are optional — session can start without them
                 }
             }
             .navigationTitle("TypingResearch")
+            .onReceive(
+                NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
+            ) { notification in
+                if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    sessionManager.measuredKeyboardHeight = frame.height
+                    if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+                       let window = windowScene.windows.first {
+                        sessionManager.safeAreaBottom = window.safeAreaInsets.bottom
+                    }
+                }
+            }
             .alert("Error", isPresented: $showError) {
                 Button("OK", role: .cancel) {}
             } message: {
@@ -174,18 +185,11 @@ struct ParticipantSetupView: View {
     private func startSession() {
         let fn = firstName.trimmingCharacters(in: .whitespaces)
         let ln = lastName.trimmingCharacters(in: .whitespaces)
-
-        guard !fn.isEmpty, !ln.isEmpty else {
-            errorMessage = "Please enter first and last name."
-            showError = true
-            return
-        }
-
         let age: Int? = ageText.isEmpty ? nil : Int(ageText)
 
         let participant = Participant(
-            firstName: fn,
-            lastName: ln,
+            firstName: fn.isEmpty ? "Anonymous" : fn,
+            lastName: ln.isEmpty ? "" : ln,
             age: age,
             dominantHand: dominantHand,
             deviceModel: DeviceInfo.modelName,

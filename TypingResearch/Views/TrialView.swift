@@ -8,25 +8,21 @@ struct TrialView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Top bar: timer + WPM
             topBar
-
-            // Time progress bar
             progressBar
 
             Spacer().frame(height: 24)
 
-            // Target text with per-character color highlight
             targetTextView
                 .padding(.horizontal, 16)
 
             Spacer()
 
-            // Custom inline QWERTY keyboard
+            // Custom inline QWERTY keyboard, sized to match the system keyboard on this device
             CustomKeyboardView { key, tapInfo in
                 handleKeyTap(key: key, tapInfo: tapInfo)
             }
-            .frame(height: 260)
+            .frame(height: sessionManager.measuredKeyboardHeight)
         }
         .padding(.top, 16)
     }
@@ -86,7 +82,7 @@ struct TrialView: View {
                     .fontWeight(.bold)
                     .foregroundColor(sessionManager.remainingSeconds < 30 ? .red : .primary)
                     .monospacedDigit()
-                Text("\(sessionManager.completedTrials.count) phrases completed")
+                Text("words typed: \(typedText.split(separator: " ").count)")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -147,8 +143,8 @@ struct TrialView: View {
                                     .foregroundColor(charColor(index: index, char: char, typedChars: typedChars))
                                     .underline(index == cursorIndex)
                                     .background(
-                                        index == cursorIndex ?
-                                        Color.yellow.opacity(0.3) : Color.clear
+                                        index == cursorIndex
+                                            ? Color.yellow.opacity(0.3) : Color.clear
                                     )
                                     .id(index)
                             }
