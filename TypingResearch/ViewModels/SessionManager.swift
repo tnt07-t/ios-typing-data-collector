@@ -49,6 +49,7 @@ final class SessionManager {
     private var lastEventTimestamp: Date?
     private var modelContext: ModelContext?
     private var sessionTimer: Timer?
+    private var timerStarted: Bool = false
 
     // Continuous mode: generate enough words to outlast any session duration
     private static let initialWordCount = 300
@@ -75,9 +76,9 @@ final class SessionManager {
         isSessionComplete = false
         completedTrials = []
         currentTrialIndex = 0
+        timerStarted = false
 
-        // Start countdown timer
-        startTimer()
+        // Timer starts on first keypress, not here
         startNextTrial()
     }
 
@@ -130,6 +131,13 @@ final class SessionManager {
     // MARK: - Event Logging
 
     func logEvent(_ data: InputEventData) {
+        // Start countdown on first keystroke
+        if !timerStarted {
+            timerStarted = true
+            trialStartTime = Date()
+            startTimer()
+        }
+
         pendingEvents.append(data)
 
         liveTypedText = data.textAfter

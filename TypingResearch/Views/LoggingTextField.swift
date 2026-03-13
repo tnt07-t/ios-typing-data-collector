@@ -21,6 +21,9 @@ struct LoggingTextField: UIViewRepresentable {
         tf.placeholder = placeholder
         tf.borderStyle = .roundedRect
         tf.font = UIFont.systemFont(ofSize: 17)
+        DispatchQueue.main.async {
+            tf.becomeFirstResponder()
+        }
         return tf
     }
 
