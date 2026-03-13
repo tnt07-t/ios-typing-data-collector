@@ -5,6 +5,7 @@ struct TrialView: View {
     var onTrialComplete: () -> Void
 
     @State private var typedText: String = ""
+    @State private var lastTapInfo: TapInfo = .none
 
     var body: some View {
         VStack(spacing: 0) {
@@ -17,6 +18,10 @@ struct TrialView: View {
                 .padding(.horizontal, 16)
 
             Spacer()
+
+            tapCoordinateBar
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
 
             // Custom inline QWERTY keyboard, sized to match the system keyboard on this device
             CustomKeyboardView { key, tapInfo in
@@ -70,6 +75,7 @@ struct TrialView: View {
         )
         sessionManager.logEvent(eventData)
         typedText = textAfter
+        lastTapInfo = tapInfo
     }
 
     // MARK: - Top Bar
@@ -167,6 +173,44 @@ struct TrialView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Tap Coordinate Bar
+
+    private var tapCoordinateBar: some View {
+        HStack(spacing: 0) {
+            // Key label
+            Text(lastTapInfo.keyLabel.isEmpty ? "—" : "[\(lastTapInfo.keyLabel)]")
+                .frame(width: 36, alignment: .leading)
+
+            Spacer()
+
+            Group {
+                coordCell(label: "local x", value: lastTapInfo.tapLocalX)
+                coordCell(label: "local y", value: lastTapInfo.tapLocalY)
+                coordCell(label: "norm x", value: lastTapInfo.tapNormX, decimals: 3)
+                coordCell(label: "norm y", value: lastTapInfo.tapNormY, decimals: 3)
+            }
+        }
+        .font(.system(size: 11, design: .monospaced))
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(.systemGray6))
+        )
+    }
+
+    private func coordCell(label: String, value: Double, decimals: Int = 1) -> some View {
+        VStack(spacing: 1) {
+            Text(String(format: decimals == 3 ? "%.3f" : "%.1f", value))
+                .fontWeight(.medium)
+                .foregroundColor(.primary)
+            Text(label)
+                .font(.system(size: 9, design: .monospaced))
+        }
+        .frame(minWidth: 52)
     }
 
     private func charColor(index: Int, char: Character, typedChars: [Character]) -> Color {
