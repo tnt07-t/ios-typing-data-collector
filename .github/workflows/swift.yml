@@ -13,19 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Discover project info
-        run: |
-          echo "=== xcodeproj files ==="
-          find . -name "*.xcodeproj" -maxdepth 3
-          echo "=== schemes ==="
-          xcodebuild -list 2>/dev/null || true
-
       - name: Build
         run: |
           xcodebuild build \
             -project TypingResearch.xcodeproj \
             -scheme TypingResearch \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=latest' \
             CODE_SIGNING_ALLOWED=NO
 
       - name: Run tests
@@ -33,5 +26,5 @@ jobs:
           xcodebuild test \
             -project TypingResearch.xcodeproj \
             -scheme TypingResearch \
-            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -destination 'platform=iOS Simulator,name=iPhone 17 Pro Max,OS=latest' \
             CODE_SIGNING_ALLOWED=NO
