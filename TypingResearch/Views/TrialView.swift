@@ -26,7 +26,7 @@ struct TrialView: View {
             CustomKeyboardView { key, tapInfo in
                 handleKeyTap(key: key, tapInfo: tapInfo)
             }
-            .frame(height: 230)
+            .frame(height: 260)
         }
         .padding(.top, 16)
     }
