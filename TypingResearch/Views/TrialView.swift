@@ -7,6 +7,10 @@ struct TrialView: View {
     @State private var typedText: String = ""
     @State private var lastTapInfo: TapInfo = .none
 
+    private var keyboardHeight: CGFloat {
+        max(180, sessionManager.measuredKeyboardHeight - sessionManager.safeAreaBottom)
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             topBar
@@ -17,19 +21,25 @@ struct TrialView: View {
             targetTextView
                 .padding(.horizontal, 16)
 
-            Spacer()
-
             tapCoordinateBar
                 .padding(.horizontal, 16)
-                .padding(.bottom, 6)
+                .padding(.top, 8)
 
-            // Custom inline QWERTY keyboard, sized to match the system keyboard on this device
-            CustomKeyboardView { key, tapInfo in
+            Spacer()
+
+            CustomKeyboardView(overlayMode: false) { key, tapInfo in
                 handleKeyTap(key: key, tapInfo: tapInfo)
             }
-            .frame(height: sessionManager.measuredKeyboardHeight)
+            .frame(height: keyboardHeight)
         }
         .padding(.top, 16)
+        // Extend the keyboard background color into the bottom safe area so the
+        // keyboard appears flush with the screen edge, matching the real iOS keyboard.
+        .background(alignment: .bottom) {
+            Color(red: 0.816, green: 0.827, blue: 0.851)
+                .frame(height: keyboardHeight + sessionManager.safeAreaBottom)
+                .ignoresSafeArea(edges: .bottom)
+        }
     }
 
     // MARK: - Key Tap Handler
@@ -84,33 +94,26 @@ struct TrialView: View {
         HStack {
             VStack(alignment: .leading, spacing: 2) {
                 Text(sessionManager.formattedRemaining)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(.title2).fontWeight(.bold)
                     .foregroundColor(sessionManager.remainingSeconds < 30 ? .red : .primary)
                     .monospacedDigit()
                 Text("words typed: \(typedText.split(separator: " ").count)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.caption).foregroundColor(.secondary)
             }
-
             Spacer()
-
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.0f WPM", sessionManager.liveWPM))
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
+                    .font(.title3).fontWeight(.semibold)
+                    .foregroundColor(.secondary).monospacedDigit()
                 Text("live speed")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(.caption).foregroundColor(.secondary)
             }
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
 
-    // MARK: - Progress Bar (time-based)
+    // MARK: - Progress Bar
 
     private var progressBar: some View {
         GeometryReader { geo in
@@ -118,7 +121,6 @@ struct TrialView: View {
                 Rectangle()
                     .fill(Color.orange.opacity(0.2))
                     .frame(height: 4)
-
                 let progress = sessionManager.sessionDurationSeconds > 0
                     ? CGFloat(sessionManager.remainingSeconds) / CGFloat(sessionManager.sessionDurationSeconds)
                     : 0
@@ -137,7 +139,7 @@ struct TrialView: View {
         Group {
             if let trial = sessionManager.currentTrial {
                 let targetChars = Array(trial.targetText)
-                let typedChars = Array(typedText)
+                let typedChars  = Array(typedText)
                 let cursorIndex = typedChars.count
 
                 ScrollViewReader { proxy in
@@ -146,11 +148,11 @@ struct TrialView: View {
                             ForEach(Array(targetChars.enumerated()), id: \.offset) { index, char in
                                 Text(String(char))
                                     .font(.system(size: 22, weight: .medium, design: .monospaced))
-                                    .foregroundColor(charColor(index: index, char: char, typedChars: typedChars))
+                                    .foregroundColor(charColor(index: index, typedCount: cursorIndex))
                                     .underline(index == cursorIndex)
                                     .background(
                                         index == cursorIndex
-                                            ? Color.yellow.opacity(0.3) : Color.clear
+                                            ? Color.orange.opacity(0.25) : Color.clear
                                     )
                                     .id(index)
                             }
@@ -159,64 +161,48 @@ struct TrialView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .onChange(of: typedText) { _, _ in
-                        if cursorIndex >= 0 {
-                            withAnimation(.easeOut(duration: 0.1)) {
-                                proxy.scrollTo(cursorIndex, anchor: .center)
-                            }
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            proxy.scrollTo(cursorIndex, anchor: .center)
                         }
                     }
                 }
                 .padding(.vertical, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(.systemGray6))
-                )
+                .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))
             }
         }
+    }
+
+    private func charColor(index: Int, typedCount: Int) -> Color {
+        if index < typedCount  { return .secondary }
+        if index == typedCount { return .primary }
+        return .primary.opacity(0.35)
     }
 
     // MARK: - Tap Coordinate Bar
 
     private var tapCoordinateBar: some View {
         HStack(spacing: 0) {
-            // Key label
             Text(lastTapInfo.keyLabel.isEmpty ? "—" : "[\(lastTapInfo.keyLabel)]")
-                .frame(width: 36, alignment: .leading)
-
+                .frame(width: 40, alignment: .leading)
             Spacer()
-
-            Group {
-                coordCell(label: "local x", value: lastTapInfo.tapLocalX)
-                coordCell(label: "local y", value: lastTapInfo.tapLocalY)
-                coordCell(label: "norm x", value: lastTapInfo.tapNormX, decimals: 3)
-                coordCell(label: "norm y", value: lastTapInfo.tapNormY, decimals: 3)
-            }
+            coordCell(label: "local x", value: lastTapInfo.tapLocalX)
+            coordCell(label: "local y", value: lastTapInfo.tapLocalY)
+            coordCell(label: "norm x",  value: lastTapInfo.tapNormX, decimals: 3)
+            coordCell(label: "norm y",  value: lastTapInfo.tapNormY, decimals: 3)
         }
         .font(.system(size: 11, design: .monospaced))
         .foregroundColor(.secondary)
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color(.systemGray6))
-        )
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))
     }
 
     private func coordCell(label: String, value: Double, decimals: Int = 1) -> some View {
         VStack(spacing: 1) {
             Text(String(format: decimals == 3 ? "%.3f" : "%.1f", value))
-                .fontWeight(.medium)
-                .foregroundColor(.primary)
-            Text(label)
-                .font(.system(size: 9, design: .monospaced))
+                .fontWeight(.medium).foregroundColor(.primary)
+            Text(label).font(.system(size: 9, design: .monospaced))
         }
         .frame(minWidth: 52)
-    }
-
-    private func charColor(index: Int, char: Character, typedChars: [Character]) -> Color {
-        if index < typedChars.count {
-            return typedChars[index] == char ? .green : .red
-        }
-        return .primary
     }
 }

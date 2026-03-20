@@ -1,3 +1,4 @@
+# makes sure that code compiles
 name: Swift
 
 on:

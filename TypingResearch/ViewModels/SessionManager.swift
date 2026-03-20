@@ -222,6 +222,14 @@ final class SessionManager {
             keyHeight: data.keyHeight
         )
         modelContext?.insert(event)
+        // Send to research backend (non-blocking, batched)
+        if let session = currentSession, let participant = participant {
+            BackendClient.shared.enqueue(
+                event: data,
+                sessionId: session.id,
+                participantId: participant.id
+            )
+        }
     }
 
     func buildEventData(
@@ -317,19 +325,20 @@ final class SessionManager {
         let endTime = Date()
         let durationMs = endTime.timeIntervalSince(start) * 1000.0
 
-        let accuracy = MetricsComputer.accuracy(target: trial.targetText, typed: finalText)
-        let correctChars = MetricsComputer.correctCharCount(target: trial.targetText, typed: finalText)
         let cps = MetricsComputer.charsPerSecond(charCount: finalText.count, durationMs: durationMs)
         let wpmVal = MetricsComputer.wpm(charCount: finalText.count, durationMs: durationMs)
 
         let backspaces = pendingEvents.filter { $0.eventType == .delete }.count
-        let inserts = pendingEvents.filter { $0.eventType == .insert }.count
+        let inserts = pendingEvents.filter { $0.eventType == .insert }
+        let correctChars = inserts.filter { $0.isCorrect }.count
+        // Per-keystroke accuracy: fraction of insert taps that hit the correct key
+        let accuracy = inserts.isEmpty ? 0.0 : Double(correctChars) / Double(inserts.count)
 
         trial.finalText = finalText
         trial.endedAt = endTime
         trial.durationMs = durationMs
         trial.backspaceCount = backspaces
-        trial.insertCount = inserts
+        trial.insertCount = inserts.count
         trial.correctChars = correctChars
         trial.totalTargetChars = trial.targetText.count
         trial.accuracy = accuracy
@@ -367,7 +376,7 @@ final class SessionManager {
         isSessionActive = false
         isTrialActive = false
         isSessionComplete = true
-
+        BackendClient.shared.flush()
         try? modelContext?.save()
     }
 
@@ -389,6 +398,7 @@ final class SessionManager {
         currentTrial = nil
         currentTrialIndex = 0
         pendingEvents = []
+        allEvents = []
         isSessionActive = false
         isTrialActive = false
         isSessionComplete = false
