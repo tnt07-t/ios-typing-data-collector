@@ -8,6 +8,7 @@ struct CustomKeyboardView: View {
     var onKeyTap: (String, TapInfo) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
+    @State private var showNumeric: Bool = false
 
     private var kbBg: Color {
         if overlayMode { return .clear }
@@ -16,9 +17,13 @@ struct CustomKeyboardView: View {
             : Color(red: 0.816, green: 0.827, blue: 0.851)
     }
 
-    private let row0 = ["q","w","e","r","t","y","u","i","o","p"]
-    private let row1 = ["a","s","d","f","g","h","j","k","l"]
-    private let row2 = ["z","x","c","v","b","n","m"]
+    private let alphaRow0 = ["q","w","e","r","t","y","u","i","o","p"]
+    private let alphaRow1 = ["a","s","d","f","g","h","j","k","l"]
+    private let alphaRow2 = ["z","x","c","v","b","n","m"]
+
+    private let numRow0  = ["1","2","3","4","5","6","7","8","9","0"]
+    private let numRow1  = ["-","/",":",";","(",")","\u{0024}","&","@","\""]
+    private let numRow2p = [".",",","?","!","'"]   // punctuation between specials
 
     private let sidePad:   CGFloat = 5
     private let keyGap:    CGFloat = 6
@@ -28,84 +33,117 @@ struct CustomKeyboardView: View {
 
     var body: some View {
         GeometryReader { geo in
-            keyboardStack(geo: geo)
+            let kw: CGFloat   = (geo.size.width - 2*sidePad - 9*keyGap) / 10
+            let sp: CGFloat   = (geo.size.width - 2*sidePad - 7*kw - 8*keyGap) / 2
+            let availH: CGFloat = geo.size.height - topPad - bottomPad - 3*rowGap
+            let keyH: CGFloat = max(34, availH / 5)
+
+            VStack(spacing: rowGap) {
+                if showNumeric {
+                    numericRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
+                } else {
+                    alphaRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
+                }
+            }
+            .padding(.horizontal, sidePad)
+            .padding(.top, topPad)
+            .padding(.bottom, bottomPad)
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+            .background(kbBg)
         }
     }
 
-    private func keyboardStack(geo: GeometryProxy) -> some View {
-        let kw: CGFloat = (geo.size.width - 2*sidePad - 9*keyGap) / 10
-        let sp: CGFloat = (geo.size.width - 2*sidePad - 7*kw - 8*keyGap) / 2
-        let availH: CGFloat = geo.size.height - topPad - bottomPad - 3*rowGap
-        let keyH: CGFloat = max(34, availH / 5)
-        return keyRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
-    }
+    // MARK: - Alpha layout
 
-    private func keyRows(geo: GeometryProxy, kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
-        VStack(spacing: rowGap) {
-            row0View(kw: kw, keyH: keyH)
-            row1View(kw: kw, sp: sp, keyH: keyH)
-            row2View(kw: kw, sp: sp, keyH: keyH)
-            row3View(geo: geo, kw: kw, sp: sp, keyH: keyH)
-        }
-        .padding(.horizontal, sidePad)
-        .padding(.top, topPad)
-        .padding(.bottom, bottomPad)
-        .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
-        .background(kbBg)
-    }
-
-    // MARK: Row builders
-
-    private func row0View(kw: CGFloat, keyH: CGFloat) -> some View {
-        HStack(spacing: keyGap) {
-            ForEach(row0, id: \.self) { k in
-                KeyCap(label: k, action: k, width: kw, height: keyH,
-                       isSpecial: false, colorScheme: colorScheme,
-                       overlayMode: overlayMode, onTap: onKeyTap)
+    private func alphaRows(geo: GeometryProxy, kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
+        Group {
+            // Row 0 — 10 letter keys
+            HStack(spacing: keyGap) {
+                ForEach(alphaRow0, id: \.self) { k in
+                    keyCap(label: k, action: k, width: kw, height: keyH, isSpecial: false)
+                }
+            }
+            // Row 1 — 9 centered letter keys
+            HStack(spacing: keyGap) {
+                Spacer().frame(width: sp + keyGap)
+                ForEach(alphaRow1, id: \.self) { k in
+                    keyCap(label: k, action: k, width: kw, height: keyH, isSpecial: false)
+                }
+                Spacer().frame(width: sp + keyGap)
+            }
+            // Row 2 — ⇧ + 7 letters + ⌫
+            HStack(spacing: keyGap) {
+                keyCap(label: "⇧", action: "", width: sp, height: keyH, isSpecial: true)
+                ForEach(alphaRow2, id: \.self) { k in
+                    keyCap(label: k, action: k, width: kw, height: keyH, isSpecial: false)
+                }
+                keyCap(label: "⌫", action: "delete", width: sp, height: keyH, isSpecial: true)
+            }
+            // Row 3 — 123 + space + return
+            HStack(spacing: keyGap) {
+                keyCap(label: "123", action: "switch_numeric", width: sp, height: keyH, isSpecial: true)
+                keyCap(label: "space", action: "space",
+                       width: geo.size.width - 2*sidePad - 2*sp - 2*keyGap,
+                       height: keyH, isSpecial: false)
+                keyCap(label: "return", action: "return", width: sp, height: keyH, isSpecial: true)
             }
         }
     }
 
-    private func row1View(kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
-        HStack(spacing: keyGap) {
-            Spacer().frame(width: sp + keyGap)
-            ForEach(row1, id: \.self) { k in
-                KeyCap(label: k, action: k, width: kw, height: keyH,
-                       isSpecial: false, colorScheme: colorScheme,
-                       overlayMode: overlayMode, onTap: onKeyTap)
+    // MARK: - Numeric / punctuation layout
+
+    private func numericRows(geo: GeometryProxy, kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
+        let puncW: CGFloat = (geo.size.width - 2*sidePad - 2*sp - 6*keyGap) / 5
+        return Group {
+            // Row 0 — digits
+            HStack(spacing: keyGap) {
+                ForEach(numRow0, id: \.self) { k in
+                    keyCap(label: k, action: k, width: kw, height: keyH, isSpecial: false)
+                }
             }
-            Spacer().frame(width: sp + keyGap)
+            // Row 1 — symbols (10 keys, same widths as digits)
+            HStack(spacing: keyGap) {
+                ForEach(numRow1, id: \.self) { k in
+                    keyCap(label: k, action: k, width: kw, height: keyH, isSpecial: false)
+                }
+            }
+            // Row 2 — [#+=] + 5 punctuation + ⌫
+            HStack(spacing: keyGap) {
+                keyCap(label: "#+=", action: "", width: sp, height: keyH, isSpecial: true)
+                ForEach(numRow2p, id: \.self) { k in
+                    keyCap(label: k, action: k, width: puncW, height: keyH, isSpecial: false)
+                }
+                keyCap(label: "⌫", action: "delete", width: sp, height: keyH, isSpecial: true)
+            }
+            // Row 3 — ABC + space + return
+            HStack(spacing: keyGap) {
+                keyCap(label: "ABC", action: "switch_alpha", width: sp, height: keyH, isSpecial: true)
+                keyCap(label: "space", action: "space",
+                       width: geo.size.width - 2*sidePad - 2*sp - 2*keyGap,
+                       height: keyH, isSpecial: false)
+                keyCap(label: "return", action: "return", width: sp, height: keyH, isSpecial: true)
+            }
         }
     }
 
-    private func row2View(kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
-        HStack(spacing: keyGap) {
-            KeyCap(label: "⇧", action: "", width: sp, height: keyH,
-                   isSpecial: true, colorScheme: colorScheme,
-                   overlayMode: overlayMode, onTap: { _, _ in })
-            ForEach(row2, id: \.self) { k in
-                KeyCap(label: k, action: k, width: kw, height: keyH,
-                       isSpecial: false, colorScheme: colorScheme,
-                       overlayMode: overlayMode, onTap: onKeyTap)
-            }
-            KeyCap(label: "⌫", action: "delete", width: sp, height: keyH,
-                   isSpecial: true, colorScheme: colorScheme,
-                   overlayMode: overlayMode, onTap: onKeyTap)
-        }
-    }
+    // MARK: - Key factory
 
-    private func row3View(geo: GeometryProxy, kw: CGFloat, sp: CGFloat, keyH: CGFloat) -> some View {
-        HStack(spacing: keyGap) {
-            KeyCap(label: "123", action: "", width: sp, height: keyH,
-                   isSpecial: true, colorScheme: colorScheme,
-                   overlayMode: overlayMode, onTap: { _, _ in })
-            KeyCap(label: "space", action: "space",
-                   width: geo.size.width - 2*sidePad - 2*sp - 2*keyGap,
-                   height: keyH, isSpecial: false, colorScheme: colorScheme,
-                   overlayMode: overlayMode, onTap: onKeyTap)
-            KeyCap(label: "return", action: "", width: sp, height: keyH,
-                   isSpecial: true, colorScheme: colorScheme,
-                   overlayMode: overlayMode, onTap: { _, _ in })
+    private func keyCap(label: String, action: String, width: CGFloat, height: CGFloat, isSpecial: Bool) -> some View {
+        KeyCap(
+            label: label,
+            action: action,
+            width: width,
+            height: height,
+            isSpecial: isSpecial,
+            colorScheme: colorScheme,
+            overlayMode: overlayMode
+        ) { act, info in
+            switch act {
+            case "switch_numeric": showNumeric = true
+            case "switch_alpha":   showNumeric = false
+            case "": break
+            default: onKeyTap(act, info)
+            }
         }
     }
 }
@@ -195,10 +233,14 @@ private struct KeyCap: View {
 
     private var labelFont: Font {
         switch label {
-        case "space", "return", "123": return .system(size: 16, weight: .regular)
-        case "⇧":                      return .system(size: 19, weight: .regular)
-        case "⌫":                      return .system(size: 21, weight: .regular)
-        default:                        return .system(size: 22, weight: .regular)
+        case "space", "return", "123", "ABC", "#+=":
+            return .system(size: 16, weight: .regular)
+        case "⇧":
+            return .system(size: 19, weight: .regular)
+        case "⌫":
+            return .system(size: 21, weight: .regular)
+        default:
+            return .system(size: 22, weight: .regular)
         }
     }
 
@@ -246,7 +288,6 @@ private struct KeyCap: View {
             .background(keyShape)
             .background(frameTracker)
             .contentShape(Rectangle())
-            // Callout appears above the key — local overlay, no parent re-render
             .overlay(alignment: .top) {
                 if isPressed && label.count == 1 && !isSpecial {
                     KeyCalloutView(label: label, keyWidth: width,

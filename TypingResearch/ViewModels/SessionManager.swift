@@ -91,8 +91,8 @@ final class SessionManager {
     private var sessionTimer: Timer?
     private var timerStarted: Bool = false
 
-    // Continuous mode: generate enough words to outlast any session duration
-    private static let initialWordCount = 300
+    // Continuous mode: enough sentences to outlast any session
+    private static let initialSentenceCount = 20
 
     // MARK: - Setup
 
@@ -152,7 +152,7 @@ final class SessionManager {
         }
         guard let session = currentSession else { return }
 
-        let targetText = WordGenerator.randomString(wordCount: Self.initialWordCount)
+        let targetText = WordGenerator.randomSentences(count: Self.initialSentenceCount)
         let trial = Trial(
             sessionId: session.id,
             trialIndex: currentTrialIndex,
@@ -188,7 +188,7 @@ final class SessionManager {
         if let trial = currentTrial {
             let remaining = trial.targetText.count - data.textAfter.count
             if remaining < 200 {
-                trial.targetText += " " + WordGenerator.randomString(wordCount: 50)
+                trial.targetText += " " + WordGenerator.randomSentences(count: 8)
             }
         }
 

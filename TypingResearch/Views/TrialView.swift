@@ -60,7 +60,7 @@ struct TrialView: View {
             eventType = .delete
             rangeStart = textAfter.count
             rangeLength = 1
-        case "space":
+        case "space", "return":
             textAfter = textBefore + " "
             replacementString = " "
             eventType = .insert
