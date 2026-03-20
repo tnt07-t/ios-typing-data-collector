@@ -5,10 +5,10 @@ import UIKit
 
 struct CustomKeyboardView: View {
     var overlayMode: Bool = false
+    @Binding var showNumeric: Bool
     var onKeyTap: (String, TapInfo) -> Void
 
     @Environment(\.colorScheme) private var colorScheme
-    @State private var showNumeric: Bool = false
 
     private var kbBg: Color {
         if overlayMode { return .clear }
@@ -128,7 +128,8 @@ struct CustomKeyboardView: View {
 
     // MARK: - Key factory
 
-    private func keyCap(label: String, action: String, width: CGFloat, height: CGFloat, isSpecial: Bool) -> some View {
+    private func keyCap(label: String, action: String, width: CGFloat, height: CGFloat,
+                        isSpecial: Bool) -> some View {
         KeyCap(
             label: label,
             action: action,

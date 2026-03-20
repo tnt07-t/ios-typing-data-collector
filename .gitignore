@@ -22,5 +22,6 @@ Pods/
 
 # Claude / project notes
 CLAUDE.md
+.claude
 build_log.md
 logs/

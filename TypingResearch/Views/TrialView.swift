@@ -6,9 +6,24 @@ struct TrialView: View {
 
     @State private var typedText: String = ""
     @State private var lastTapInfo: TapInfo = .none
+    @State private var showNumericKeyboard: Bool = false
+    @Environment(\.colorScheme) private var colorScheme
+
+    // Mirror CustomKeyboardView layout constants so the buffer strip maps taps correctly
+    private let kbSidePad: CGFloat = 5
+    private let kbKeyGap:  CGFloat = 6
+    private let kbBufH:    CGFloat = 8
+    private let alphaTop = ["q","w","e","r","t","y","u","i","o","p"]
+    private let numTop   = ["1","2","3","4","5","6","7","8","9","0"]
 
     private var keyboardHeight: CGFloat {
         max(180, sessionManager.measuredKeyboardHeight - sessionManager.safeAreaBottom)
+    }
+
+    private var kbBgColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.176, green: 0.176, blue: 0.184)
+            : Color(red: 0.816, green: 0.827, blue: 0.851)
     }
 
     var body: some View {
@@ -27,17 +42,18 @@ struct TrialView: View {
 
             Spacer()
 
-            CustomKeyboardView(overlayMode: false) { key, tapInfo in
+            // Buffer strip: same keyboard background color, forwards taps to nearest top-row key
+            bufferStrip
+
+            CustomKeyboardView(overlayMode: false, showNumeric: $showNumericKeyboard) { key, tapInfo in
                 handleKeyTap(key: key, tapInfo: tapInfo)
             }
             .frame(height: keyboardHeight)
         }
         .padding(.top, 16)
-        // Extend the keyboard background color into the bottom safe area so the
-        // keyboard appears flush with the screen edge, matching the real iOS keyboard.
         .background(alignment: .bottom) {
-            Color(red: 0.816, green: 0.827, blue: 0.851)
-                .frame(height: keyboardHeight + sessionManager.safeAreaBottom)
+            kbBgColor
+                .frame(height: keyboardHeight + kbBufH + sessionManager.safeAreaBottom)
                 .ignoresSafeArea(edges: .bottom)
         }
     }
@@ -66,6 +82,7 @@ struct TrialView: View {
             eventType = .insert
             rangeStart = textBefore.count
             rangeLength = 0
+            if showNumericKeyboard { showNumericKeyboard = false }
         default:
             textAfter = textBefore + key
             replacementString = key
@@ -86,6 +103,44 @@ struct TrialView: View {
         sessionManager.logEvent(eventData)
         typedText = textAfter
         lastTapInfo = tapInfo
+    }
+
+    // MARK: - Buffer Strip
+
+    private var bufferStrip: some View {
+        GeometryReader { geo in
+            let globalFrame = geo.frame(in: .global)
+            bufferStripContent(width: geo.size.width, globalFrame: globalFrame)
+        }
+        .frame(height: kbBufH)
+    }
+
+    private func bufferStripContent(width: CGFloat, globalFrame: CGRect) -> some View {
+        let kw   = (width - 2*kbSidePad - 9*kbKeyGap) / 10
+        let step = kw + kbKeyGap
+        // Approximate key height from keyboard frame (5 rows share available height)
+        let keyH = max(34, (keyboardHeight - 3 * 11) / 5)
+        return kbBgColor
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .local)
+                    .onEnded { value in
+                        let row    = showNumericKeyboard ? numTop : alphaTop
+                        let x      = value.location.x - kbSidePad
+                        let idx    = max(0, min(Int(x / step), row.count - 1))
+                        let localX = min(max(x - CGFloat(idx) * step, 0), kw)
+                        let tapInfo = TapInfo(
+                            keyLabel:   row[idx],
+                            tapLocalX:  Double(localX),
+                            tapLocalY:  Double(value.location.y),
+                            keyScreenX: Double(globalFrame.minX + kbSidePad + CGFloat(idx) * step),
+                            keyScreenY: Double(globalFrame.maxY),   // top of first keyboard row
+                            keyWidth:   Double(kw),
+                            keyHeight:  Double(keyH)
+                        )
+                        handleKeyTap(key: row[idx], tapInfo: tapInfo)
+                    }
+            )
     }
 
     // MARK: - Top Bar
