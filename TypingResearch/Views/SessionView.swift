@@ -38,6 +38,7 @@ struct SummaryView: View {
     @State private var showResetConfirm: Bool = false
     @State private var isGeneratingReport: Bool = false
     @State private var isGeneratingCoordPDF: Bool = false
+    @State private var plotLayout: TapDotPlotView.LayoutMode = .alpha
 
     var body: some View {
         NavigationStack {
@@ -107,12 +108,23 @@ struct SummaryView: View {
 
     private var tapPlotSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Tap Distribution")
-                .font(.headline)
+            HStack {
+                Text("Tap Distribution")
+                    .font(.headline)
+                Spacer()
+                Picker("Layout", selection: $plotLayout) {
+                    ForEach(TapDotPlotView.LayoutMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 120)
+            }
 
             TapDotPlotView(
                 events: sessionManager.allEvents,
-                colorMode: .byKey
+                colorMode: .byKey,
+                layoutMode: plotLayout
             )
         }
     }

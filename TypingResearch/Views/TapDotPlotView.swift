@@ -39,6 +39,14 @@ struct TapDotPlotView: View {
         var id: String { rawValue }
     }
 
+    enum LayoutMode: String, CaseIterable, Identifiable {
+        case alpha   = "ABC"
+        case numeric = "123"
+        var id: String { rawValue }
+    }
+
+    var layoutMode: LayoutMode = .alpha
+
     private let sidePad:    CGFloat = 3
     private let keyGap:     CGFloat = 6
     private let rowGap:     CGFloat = 11
@@ -46,9 +54,23 @@ struct TapDotPlotView: View {
     private let bottomPad:  CGFloat = 3
     private let keyH:       CGFloat = 42
 
+    // Alpha layout keys
     private let row0 = ["q","w","e","r","t","y","u","i","o","p"]
     private let row1 = ["a","s","d","f","g","h","j","k","l"]
     private let row2 = ["z","x","c","v","b","n","m"]
+
+    // Numeric layout keys (mirrors CustomKeyboardView)
+    private let numRow0  = ["1","2","3","4","5","6","7","8","9","0"]
+    private let numRow1  = ["-","/",":",";","(",")","\u{0024}","&","@","\""]
+    private let numRow2p = [".",",","?","!","'"]
+
+    // Keys that belong to each layout (for filtering dots)
+    private var alphaKeys: Set<String> {
+        Set(row0 + row1 + row2 + ["space", "delete"])
+    }
+    private var numericKeys: Set<String> {
+        Set(numRow0 + numRow1 + numRow2p + ["space"])
+    }
 
     private var canvasHeight: CGFloat {
         topPad + 4 * keyH + 3 * rowGap + bottomPad
@@ -151,8 +173,10 @@ struct TapDotPlotView: View {
     }
 
     private var validDots: [InputEventData] {
-        events.filter {
+        let allowedKeys = layoutMode == .alpha ? alphaKeys : numericKeys
+        return events.filter {
             !$0.keyLabel.isEmpty &&
+            allowedKeys.contains($0.keyLabel) &&
             !($0.tapNormX == 0 && $0.tapNormY == 0 &&
               $0.tapLocalX == 0 && $0.tapLocalY == 0)
         }
@@ -175,26 +199,54 @@ struct TapDotPlotView: View {
     }
 
     private func buildFrames(W: CGFloat, kw: CGFloat, sp: CGFloat) -> [String: CGRect] {
-        var f = [String: CGRect]()
+        layoutMode == .alpha
+            ? buildAlphaFrames(W: W, kw: kw, sp: sp)
+            : buildNumericFrames(W: W, kw: kw, sp: sp)
+    }
 
+    private func buildAlphaFrames(W: CGFloat, kw: CGFloat, sp: CGFloat) -> [String: CGRect] {
+        var f = [String: CGRect]()
         let y0 = topPad
         for (i, k) in row0.enumerated() {
-            f[k] = CGRect(x: sidePad + CGFloat(i) * (kw + keyGap), y: y0, width: kw, height: keyH)
+            f[k] = CGRect(x: sidePad + CGFloat(i)*(kw+keyGap), y: y0, width: kw, height: keyH)
         }
-
         let y1 = y0 + keyH + rowGap
         let row1Start = (W - 9*kw - 8*keyGap) / 2
         for (i, k) in row1.enumerated() {
-            f[k] = CGRect(x: row1Start + CGFloat(i) * (kw + keyGap), y: y1, width: kw, height: keyH)
+            f[k] = CGRect(x: row1Start + CGFloat(i)*(kw+keyGap), y: y1, width: kw, height: keyH)
         }
-
         let y2 = y1 + keyH + rowGap
         let row2Start = sidePad + sp + keyGap
         for (i, k) in row2.enumerated() {
-            f[k] = CGRect(x: row2Start + CGFloat(i) * (kw + keyGap), y: y2, width: kw, height: keyH)
+            f[k] = CGRect(x: row2Start + CGFloat(i)*(kw+keyGap), y: y2, width: kw, height: keyH)
         }
         f["delete"] = CGRect(x: W - sidePad - sp, y: y2, width: sp, height: keyH)
+        let y3 = y2 + keyH + rowGap
+        f["space"] = CGRect(x: sidePad + sp + keyGap, y: y3,
+                            width: W - 2*sidePad - 2*sp - 2*keyGap, height: keyH)
+        return f
+    }
 
+    private func buildNumericFrames(W: CGFloat, kw: CGFloat, sp: CGFloat) -> [String: CGRect] {
+        var f = [String: CGRect]()
+        // Row 0: digits — same grid as alpha row 0
+        let y0 = topPad
+        for (i, k) in numRow0.enumerated() {
+            f[k] = CGRect(x: sidePad + CGFloat(i)*(kw+keyGap), y: y0, width: kw, height: keyH)
+        }
+        // Row 1: symbols — same grid (10 keys)
+        let y1 = y0 + keyH + rowGap
+        for (i, k) in numRow1.enumerated() {
+            f[k] = CGRect(x: sidePad + CGFloat(i)*(kw+keyGap), y: y1, width: kw, height: keyH)
+        }
+        // Row 2: 5 punctuation keys between specials
+        let y2 = y1 + keyH + rowGap
+        let puncW = (W - 2*sidePad - 2*sp - 6*keyGap) / 5
+        let puncStart = sidePad + sp + keyGap
+        for (i, k) in numRow2p.enumerated() {
+            f[k] = CGRect(x: puncStart + CGFloat(i)*(puncW+keyGap), y: y2, width: puncW, height: keyH)
+        }
+        // Row 3: space
         let y3 = y2 + keyH + rowGap
         f["space"] = CGRect(x: sidePad + sp + keyGap, y: y3,
                             width: W - 2*sidePad - 2*sp - 2*keyGap, height: keyH)
