@@ -35,8 +35,7 @@ struct TapDotPlotView: View {
     var transparent: Bool         = false
 
     enum DotColorMode: String, CaseIterable, Identifiable {
-        case byKey  = "By Key"
-        case byTime = "By Time"
+        case byKey = "By Key"
         var id: String { rawValue }
     }
 
@@ -172,10 +171,7 @@ struct TapDotPlotView: View {
     }
 
     private func dotColor(event: InputEventData, index: Int, total: Int) -> Color {
-        switch colorMode {
-        case .byKey:  return .dotColor(forKey: event.keyLabel)
-        case .byTime: return .dotColor(forTimeIndex: index, total: total)
-        }
+        return .dotColor(forKey: event.keyLabel)
     }
 
     private func buildFrames(W: CGFloat, kw: CGFloat, sp: CGFloat) -> [String: CGRect] {

@@ -36,7 +36,6 @@ struct SummaryView: View {
     var sessionManager: SessionManager
     @State private var shareItem: ShareItem? = nil
     @State private var showResetConfirm: Bool = false
-    @State private var dotColorMode: TapDotPlotView.DotColorMode = .byKey
     @State private var isGeneratingReport: Bool = false
     @State private var isGeneratingCoordPDF: Bool = false
 
@@ -108,22 +107,12 @@ struct SummaryView: View {
 
     private var tapPlotSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Tap Distribution")
-                    .font(.headline)
-                Spacer()
-                Picker("Color", selection: $dotColorMode) {
-                    ForEach(TapDotPlotView.DotColorMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .frame(width: 170)
-            }
+            Text("Tap Distribution")
+                .font(.headline)
 
             TapDotPlotView(
                 events: sessionManager.allEvents,
-                colorMode: dotColorMode
+                colorMode: .byKey
             )
         }
     }
