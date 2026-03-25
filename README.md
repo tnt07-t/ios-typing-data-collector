@@ -1,4 +1,4 @@
-# TypingResearch — iOS Typing Data Collector
+# TypingResearch — iOS Typing Data Collector (V1 Hidden)
 
 An iPhone app for HCI keyboard research. Collects keystroke-level typing data including tap coordinates, timing, and accuracy metrics from participants performing timed typing sessions.
 
