@@ -28,15 +28,16 @@ struct CustomKeyboardView: View {
     private let sidePad:   CGFloat = 5
     private let keyGap:    CGFloat = 6
     private let rowGap:    CGFloat = 11
-    private let topPad:    CGFloat = 0
     private let bottomPad: CGFloat = 3
+    private let keyH:      CGFloat = 42   // Apple uses fixed 42pt — does not scale with screen
 
     var body: some View {
         GeometryReader { geo in
-            let kw: CGFloat   = (geo.size.width - 2*sidePad - 9*keyGap) / 10
-            let sp: CGFloat   = (geo.size.width - 2*sidePad - 7*kw - 8*keyGap) / 2
-            let availH: CGFloat = geo.size.height - topPad - bottomPad - 3*rowGap
-            let keyH: CGFloat = max(34, availH / 5)
+            let kw: CGFloat = (geo.size.width - 2*sidePad - 9*keyGap) / 10
+            let sp: CGFloat = (geo.size.width - 2*sidePad - 7*kw - 8*keyGap) / 2
+            // Remaining space after keys + gaps + bottom goes to topPad (matches Apple's layout)
+            let usedH: CGFloat = 4*keyH + 3*rowGap + bottomPad + 38  // 38 = globe/mic row
+            let topPad: CGFloat = max(8, geo.size.height - usedH)
 
             ZStack(alignment: .bottom) {
                 // Key rows — aligned to top, leaving natural free space at the bottom
@@ -50,7 +51,7 @@ struct CustomKeyboardView: View {
                 .padding(.horizontal, sidePad)
                 .padding(.top, topPad)
                 .padding(.bottom, bottomPad)
-                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+                .frame(width: geo.size.width, alignment: .top)
 
                 // Globe & mic — float in the free space below the last key row
                 globeMicBar(colorScheme: colorScheme, sidePad: sidePad)
