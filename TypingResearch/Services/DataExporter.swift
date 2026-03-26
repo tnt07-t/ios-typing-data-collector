@@ -57,50 +57,48 @@ final class DataExporter {
         var rows: [String] = []
 
         rows.append([
-            "participant_id", "participant_first", "participant_last",
-            "session_id", "trial_id",
-            "timestamp_iso", "timestamp_ms",
-            "event_type",
-            "expected_char", "actual_char", "is_correct",
-            "inter_key_interval_ms",
-            "range_start", "range_length",
-            "replacement_string",
-            "text_before", "text_after",
+            // Identity
+            "participant_first", "participant_last", "participant_id",
+            // Key & tap coordinates
+            "event_type", "key_label",
             "tap_local_x", "tap_local_y", "tap_norm_x", "tap_norm_y",
-            "key_label", "key_screen_x", "key_screen_y", "key_width", "key_height"
+            "key_screen_x", "key_screen_y", "key_width", "key_height",
+            // Correctness
+            "expected_char", "actual_char", "is_correct",
+            // Text context
+            "replacement_string", "range_start", "range_length",
+            "text_before", "text_after",
+            // Time (rightmost)
+            "timestamp_ms", "inter_key_interval_ms"
         ].joined(separator: ","))
 
-        let iso = ISO8601DateFormatter()
         let sessionStart = session.startedAt
 
         for event in events {
             let row: [String] = [
-                csvEscape(session.participantId.uuidString),
                 csvEscape(participant?.firstName ?? ""),
                 csvEscape(participant?.lastName ?? ""),
-                csvEscape(session.id.uuidString),
-                csvEscape(event.trialId.uuidString),
-                csvEscape(iso.string(from: event.timestamp)),
-                String(format: "%.3f", event.timestamp.timeIntervalSince(sessionStart) * 1000),
+                csvEscape(session.participantId.uuidString),
                 csvEscape(event.eventType.rawValue),
-                csvEscape(event.expectedChar),
-                csvEscape(event.actualChar),
-                event.isCorrect ? "1" : "0",
-                String(format: "%.3f", event.interKeyIntervalMs),
-                "\(event.rangeStart)",
-                "\(event.rangeLength)",
-                csvEscape(event.replacementString),
-                csvEscape(event.textBefore),
-                csvEscape(event.textAfter),
+                csvEscape(event.keyLabel),
                 String(format: "%.4f", event.tapLocalX),
                 String(format: "%.4f", event.tapLocalY),
                 String(format: "%.6f", event.tapNormX),
                 String(format: "%.6f", event.tapNormY),
-                csvEscape(event.keyLabel),
                 String(format: "%.4f", event.keyScreenX),
                 String(format: "%.4f", event.keyScreenY),
                 String(format: "%.4f", event.keyWidth),
-                String(format: "%.4f", event.keyHeight)
+                String(format: "%.4f", event.keyHeight),
+                csvEscape(event.expectedChar),
+                csvEscape(event.actualChar),
+                event.isCorrect ? "1" : "0",
+                csvEscape(event.replacementString),
+                "\(event.rangeStart)",
+                "\(event.rangeLength)",
+                csvEscape(event.textBefore),
+                csvEscape(event.textAfter),
+                String(format: "%.3f", event.timestamp.timeIntervalSince(sessionStart) * 1000),
+                String(format: "%.3f", event.interKeyIntervalMs)
             ]
             rows.append(row.joined(separator: ","))
         }
