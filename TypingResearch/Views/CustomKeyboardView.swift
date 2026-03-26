@@ -56,7 +56,7 @@ struct CustomKeyboardView: View {
                 // Globe & mic anchored to the bottom of the full keyboard frame
                 globeMicBar(colorScheme: colorScheme, sidePad: sidePad)
                     .frame(width: geo.size.width)
-                    .padding(.bottom, 6)
+                    .padding(.bottom, 2)
                     .allowsHitTesting(false)
             }
             .frame(width: geo.size.width, height: geo.size.height)
