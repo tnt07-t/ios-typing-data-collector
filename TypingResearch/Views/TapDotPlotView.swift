@@ -10,10 +10,10 @@ extension Color {
             "z","x","c","v","b","n","m",
             "space","delete"
         ]
-        let idx    = Double(allKeys.firstIndex(of: key) ?? 0)
-        let total  = Double(allKeys.count)
-        return Color(hue: (idx / total * 0.82 + 0.05).truncatingRemainder(dividingBy: 1.0),
-                     saturation: 0.78, brightness: 0.9)
+        let idx = Double(allKeys.firstIndex(of: key) ?? 0)
+        let hue = (idx * 0.618033988749895).truncatingRemainder(dividingBy: 1.0)
+        let sat = idx.truncatingRemainder(dividingBy: 2) == 0 ? 0.82 : 0.65
+        return Color(hue: hue, saturation: sat, brightness: 0.88)
     }
 
     static func dotColor(forTimeIndex idx: Int, total: Int) -> Color {
@@ -113,15 +113,28 @@ struct TapDotPlotView: View {
                     }
                 }
 
-                for (idx, event) in dots.enumerated() {
+                for event in dots {
                     guard let frame = frames[event.keyLabel] else { continue }
-                    let x = frame.minX + clamp(event.tapNormX) * frame.width
-                    let y = frame.minY + clamp(event.tapNormY) * frame.height
+                    let normX = event.keyWidth > 0 ? event.tapLocalX / event.keyWidth : 0.5
+                    let normY = event.keyHeight > 0 ? event.tapLocalY / event.keyHeight : 0.5
+                    let x = frame.minX + CGFloat(normX) * frame.width
+                    let y = frame.minY + CGFloat(normY) * frame.height
+
+                    let colorKey = event.expectedChar.isEmpty ? event.keyLabel : event.expectedChar
                     let r = dotRadius
                     ctx.fill(
                         Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r*2, height: r*2)),
-                        with: .color(dotColor(event: event, index: idx, total: dots.count).opacity(0.85))
+                        with: .color(Color.dotColor(forKey: colorKey).opacity(0.85))
                     )
+                    let label = colorKey == "space" ? "\u{00B7}" : colorKey == "delete" ? "\u{232B}" : colorKey
+                    if label.count <= 1 {
+                        ctx.draw(
+                            Text(label)
+                                .font(.system(size: 6, weight: .bold, design: .monospaced))
+                                .foregroundColor(Color.dotColor(forKey: colorKey)),
+                            at: CGPoint(x: x + r + 5, y: y)
+                        )
+                    }
                 }
 
                 for (_, rect) in frames {
@@ -151,7 +164,7 @@ struct TapDotPlotView: View {
     }
 
     private var legend: some View {
-        let shownKeys = Set(validDots.map(\.keyLabel)).sorted()
+        let shownKeys = Set(validDots.map { $0.expectedChar.isEmpty ? $0.keyLabel : $0.expectedChar }).sorted()
         guard !shownKeys.isEmpty else { return AnyView(EmptyView()) }
         return AnyView(
             ScrollView(.horizontal, showsIndicators: false) {
@@ -186,6 +199,15 @@ struct TapDotPlotView: View {
         CGFloat(max(0.01, min(0.99, v.isNaN ? 0.5 : v)))
     }
 
+    private func keyboardScreenBounds(from events: [InputEventData]) -> CGRect {
+        guard !events.isEmpty else { return .zero }
+        let minX = events.map { $0.keyScreenX }.min() ?? 0
+        let minY = events.map { $0.keyScreenY }.min() ?? 0
+        let maxX = events.map { $0.keyScreenX + $0.keyWidth }.max() ?? 1
+        let maxY = events.map { $0.keyScreenY + $0.keyHeight }.max() ?? 1
+        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
+    }
+
     private func keyDisplay(_ label: String) -> String {
         switch label {
         case "delete": return "⌫"
@@ -195,7 +217,8 @@ struct TapDotPlotView: View {
     }
 
     private func dotColor(event: InputEventData, index: Int, total: Int) -> Color {
-        return .dotColor(forKey: event.keyLabel)
+        let colorKey = event.expectedChar.isEmpty ? event.keyLabel : event.expectedChar
+        return .dotColor(forKey: colorKey)
     }
 
     private func buildFrames(W: CGFloat, kw: CGFloat, sp: CGFloat) -> [String: CGRect] {

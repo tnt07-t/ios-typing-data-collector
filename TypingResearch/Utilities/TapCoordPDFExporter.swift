@@ -38,6 +38,7 @@ final class TapCoordPDFExporter {
                 x: e.keyScreenX + e.tapLocalX - kbOriginX,
                 y: e.keyScreenY + e.tapLocalY - kbOriginY,
                 key: e.keyLabel,
+                expectedChar: e.expectedChar,
                 isCorrect: e.isCorrect
             )
         }
@@ -260,7 +261,8 @@ final class TapCoordPDFExporter {
             let px = ox + CGFloat(coord.x) * scale
             let py = oy + CGFloat(coord.y) * scale
             let dotRect = CGRect(x: px - dotR, y: py - dotR, width: dotR*2, height: dotR*2)
-            c.setFillColor(keyColor(coord.key).withAlphaComponent(0.85).cgColor)
+            let colorKey = coord.expectedChar.isEmpty ? coord.key : coord.expectedChar
+            c.setFillColor(keyColor(colorKey).withAlphaComponent(0.85).cgColor)
             c.fillEllipse(in: dotRect)
             c.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
             c.setLineWidth(0.5)
@@ -383,6 +385,7 @@ final class TapCoordPDFExporter {
     private struct TapCoord {
         let x, y: Double
         let key: String
+        let expectedChar: String
         let isCorrect: Bool
     }
 
@@ -391,9 +394,10 @@ final class TapCoordPDFExporter {
                            "z","x","c","v","b","n","m","space","delete"]
 
     private func keyColor(_ key: String) -> UIColor {
-        let idx   = Double(allKeys.firstIndex(of: key) ?? 0)
-        let hue   = (idx / Double(allKeys.count) * 0.82 + 0.05).truncatingRemainder(dividingBy: 1.0)
-        return UIColor(hue: CGFloat(hue), saturation: 0.78, brightness: 0.75, alpha: 1.0)
+        let idx = Double(allKeys.firstIndex(of: key) ?? 0)
+        let hue = (idx * 0.618033988749895).truncatingRemainder(dividingBy: 1.0)
+        let sat: CGFloat = idx.truncatingRemainder(dividingBy: 2) == 0 ? 0.82 : 0.65
+        return UIColor(hue: CGFloat(hue), saturation: sat, brightness: 0.85, alpha: 1.0)
     }
 
     private func hasCoords(_ e: InputEventData) -> Bool {

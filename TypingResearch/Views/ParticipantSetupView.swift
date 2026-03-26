@@ -11,42 +11,10 @@ struct ParticipantSetupView: View {
     @State private var ageText: String = ""
     @State private var dominantHand: DominantHand = .right
 
-    // Session duration
-    @State private var durationOption: DurationOption = .fifteen
-    @State private var customMinutes: Int = 1
-    @State private var customSeconds: Int = 0
-
     @State private var showError: Bool = false
     @State private var errorMessage: String = ""
 
-    enum DurationOption: String, CaseIterable, Identifiable {
-        case fifteen = "15s"
-        case thirty = "30s"
-        case fortyfive = "45s"
-        case oneMin = "1 min"
-        case custom = "Custom"
-        var id: String { rawValue }
-    }
-
-    var resolvedDurationSeconds: Int {
-        switch durationOption {
-        case .fifteen:   return 15
-        case .thirty:    return 30
-        case .fortyfive: return 45
-        case .oneMin:    return 60
-        case .custom:
-            let total = customMinutes * 60 + customSeconds
-            return max(5, total)
-        }
-    }
-
-    var formattedCustomDuration: String {
-        let total = resolvedDurationSeconds
-        if total < 60 { return "\(total)s" }
-        let m = total / 60
-        let s = total % 60
-        return s == 0 ? "\(m) min" : "\(m)m \(s)s"
-    }
+    private let sessionDurationSeconds = 300   // fixed 5-minute sessions
 
     var body: some View {
         NavigationStack {
@@ -72,20 +40,10 @@ struct ParticipantSetupView: View {
                 }
 
                 Section("Session Duration") {
-                    Picker("Duration", selection: $durationOption) {
-                        ForEach(DurationOption.allCases) { opt in
-                            Text(opt.rawValue).tag(opt)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if durationOption == .custom {
-                        customDurationPicker
-                    } else {
-                        Text("Session will run for \(durationOption.rawValue), generating phrases continuously.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    LabeledContent("Duration", value: "5 minutes")
+                    Text("A random corpus will be assigned when the session starts.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Device Info") {
@@ -129,57 +87,6 @@ struct ParticipantSetupView: View {
         }
     }
 
-    // MARK: - Custom Duration Wheel Picker
-
-    private var customDurationPicker: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 0) {
-                // Minutes wheel
-                VStack(spacing: 2) {
-                    Text("MIN")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Picker("Minutes", selection: $customMinutes) {
-                        ForEach(0..<60) { m in
-                            Text("\(m)").tag(m)
-                        }
-                    }
-                    .pickerStyle(.wheel)
-                    .frame(width: 80, height: 120)
-                    .clipped()
-                }
-
-                Text(":")
-                    .font(.title)
-                    .fontWeight(.light)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 8)
-
-                // Seconds wheel
-                VStack(spacing: 2) {
-                    Text("SEC")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Picker("Seconds", selection: $customSeconds) {
-                        ForEach(0..<60) { s in
-                            Text(String(format: "%02d", s)).tag(s)
-                        }
-                    }
-                    .pickerStyle(.wheel)
-                    .frame(width: 80, height: 120)
-                    .clipped()
-                }
-            }
-            .frame(maxWidth: .infinity)
-
-            Text("Duration: \(formattedCustomDuration)")
-                .font(.subheadline)
-                .fontWeight(.medium)
-                .foregroundColor(.orange)
-        }
-        .padding(.vertical, 4)
-    }
-
     // MARK: - Start
 
     private func startSession() {
@@ -200,6 +107,6 @@ struct ParticipantSetupView: View {
         )
         modelContext.insert(participant)
         sessionManager.configure(modelContext: modelContext)
-        sessionManager.startSession(participant: participant, durationSeconds: resolvedDurationSeconds)
+        sessionManager.startSession(participant: participant, durationSeconds: sessionDurationSeconds)
     }
 }

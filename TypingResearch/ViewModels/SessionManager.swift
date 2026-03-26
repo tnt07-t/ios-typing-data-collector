@@ -108,6 +108,9 @@ final class SessionManager {
         self.remainingSeconds = durationSeconds
         self.elapsedSeconds = 0
 
+        // Pick a fresh random corpus for this session
+        WordGenerator.selectRandomCorpus()
+
         let session = Session(participantId: participant.id)
         self.currentSession = session
         modelContext?.insert(session)
@@ -275,8 +278,12 @@ final class SessionManager {
 
         let targetChars = Array(trial.targetText)
         let expectedIndex = rangeStart
+
+        // Backspace has no expected character — don't associate it with a target letter
         let expectedChar: String
-        if expectedIndex >= 0 && expectedIndex < targetChars.count {
+        if eventType == .delete {
+            expectedChar = ""
+        } else if expectedIndex >= 0 && expectedIndex < targetChars.count {
             expectedChar = String(targetChars[expectedIndex])
         } else {
             expectedChar = ""
@@ -289,7 +296,9 @@ final class SessionManager {
             actualChar = ""
         }
 
-        let isCorrect = !actualChar.isEmpty && actualChar == expectedChar
+        // isCorrect: true only when the typed character matches the target.
+        // Delete events are excluded from accuracy — they carry no expected character.
+        let isCorrect = eventType != .delete && !actualChar.isEmpty && actualChar == expectedChar
 
         return InputEventData(
             trialId: trial.id,
@@ -361,16 +370,16 @@ final class SessionManager {
         sessionTimer?.invalidate()
         sessionTimer = nil
 
-        guard let session = currentSession else { return }
+        if let session = currentSession {
+            session.endedAt = Date()
+            session.completedTrials = completedTrials.count
+            session.totalTrials = completedTrials.count
 
-        session.endedAt = Date()
-        session.completedTrials = completedTrials.count
-        session.totalTrials = completedTrials.count
-
-        if !completedTrials.isEmpty {
-            session.meanAccuracy = completedTrials.map(\.accuracy).reduce(0, +) / Double(completedTrials.count)
-            session.meanCharsPerSecond = completedTrials.map(\.charsPerSecond).reduce(0, +) / Double(completedTrials.count)
-            session.totalBackspaces = completedTrials.map(\.backspaceCount).reduce(0, +)
+            if !completedTrials.isEmpty {
+                session.meanAccuracy = completedTrials.map(\.accuracy).reduce(0, +) / Double(completedTrials.count)
+                session.meanCharsPerSecond = completedTrials.map(\.charsPerSecond).reduce(0, +) / Double(completedTrials.count)
+                session.totalBackspaces = completedTrials.map(\.backspaceCount).reduce(0, +)
+            }
         }
 
         isSessionActive = false

@@ -156,6 +156,23 @@ struct TrialView: View {
                     .font(.caption).foregroundColor(.secondary)
             }
             Spacer()
+            Button {
+                if sessionManager.isTrialActive {
+                    sessionManager.submitTrial(finalText: typedText)
+                }
+                sessionManager.finalizeSession()
+            } label: {
+                Text("End Session")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.red.opacity(0.18))
+                    )
+            }
+            Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(String(format: "%.0f WPM", sessionManager.liveWPM))
                     .font(.title3).fontWeight(.semibold)
@@ -205,10 +222,7 @@ struct TrialView: View {
                                     .font(.system(size: 22, weight: .medium, design: .monospaced))
                                     .foregroundColor(charColor(index: index, typedCount: cursorIndex))
                                     .underline(index == cursorIndex)
-                                    .background(
-                                        index == cursorIndex
-                                            ? Color.orange.opacity(0.25) : Color.clear
-                                    )
+                                    .background(index == cursorIndex ? Color.orange.opacity(0.25) : Color.clear)
                                     .id(index)
                             }
                         }

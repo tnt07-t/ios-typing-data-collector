@@ -38,19 +38,49 @@ struct CustomKeyboardView: View {
             let availH: CGFloat = geo.size.height - topPad - bottomPad - 3*rowGap
             let keyH: CGFloat = max(34, availH / 5)
 
-            VStack(spacing: rowGap) {
-                if showNumeric {
-                    numericRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
-                } else {
-                    alphaRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
+            ZStack(alignment: .bottom) {
+                // Key rows — aligned to top, leaving natural free space at the bottom
+                VStack(spacing: rowGap) {
+                    if showNumeric {
+                        numericRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
+                    } else {
+                        alphaRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
+                    }
                 }
+                .padding(.horizontal, sidePad)
+                .padding(.top, topPad)
+                .padding(.bottom, bottomPad)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
+
+                // Globe & mic — float in the free space below the last key row
+                globeMicBar(colorScheme: colorScheme, sidePad: sidePad)
+                    .frame(width: geo.size.width)
+                    .padding(.bottom, 6)
+                    .allowsHitTesting(false)
             }
-            .padding(.horizontal, sidePad)
-            .padding(.top, topPad)
-            .padding(.bottom, bottomPad)
-            .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
             .background(kbBg)
         }
+    }
+
+    private func globeMicBar(colorScheme: ColorScheme, sidePad: CGFloat) -> some View {
+        let iconColor = colorScheme == .dark
+            ? Color(white: 0.55)
+            : Color(white: 0.45)
+
+        return HStack {
+            Image(systemName: "globe")
+                .font(.system(size: 23, weight: .light))
+                .foregroundColor(iconColor)
+                .frame(width: 44, height: 30)
+
+            Spacer()
+
+            Image(systemName: "mic")
+                .font(.system(size: 23, weight: .light))
+                .foregroundColor(iconColor)
+                .frame(width: 44, height: 30)
+        }
+        .padding(.horizontal, sidePad + 2)
     }
 
     // MARK: - Alpha layout
@@ -234,10 +264,12 @@ private struct KeyCap: View {
 
     private var labelFont: Font {
         switch label {
-        case "space", "return", "123", "ABC", "#+=":
+        case "space", "123", "ABC", "#+=":
             return .system(size: 16, weight: .regular)
         case "⇧":
             return .system(size: 19, weight: .regular)
+        case "return":
+            return .system(size: 13, weight: .regular)
         case "⌫":
             return .system(size: 21, weight: .regular)
         default:
@@ -282,10 +314,18 @@ private struct KeyCap: View {
     }
 
     var body: some View {
-        Text(label)
-            .font(labelFont)
-            .foregroundColor(labelColor)
-            .frame(width: width, height: height)
+        Group {
+            if label == "return" {
+                Image(systemName: "return")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundColor(labelColor)
+            } else {
+                Text(label)
+                    .font(labelFont)
+                    .foregroundColor(labelColor)
+            }
+        }
+        .frame(width: width, height: height)
             .background(keyShape)
             .background(frameTracker)
             .contentShape(Rectangle())

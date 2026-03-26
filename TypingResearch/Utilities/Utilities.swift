@@ -103,100 +103,177 @@ struct DeviceInfo {
 // MARK: - WordGenerator
 
 struct WordGenerator {
-    /// Corpus of natural sentences optimized for HCI typing data collection.
-    /// Every sentence contains at least 2 of {j, k, q, v, x, z} for even rare-letter coverage.
-    /// Mix of statements, apostrophe sentences, questions, and commands for rhythm variety.
-    static let sentencePool: [String] = [
+    // MARK: Corpus sets — one is chosen at random per session
 
-        // MARK: Everyday statements
-        "she quickly packed her jacket and jogged across campus to the lecture hall.",
-        "jake fixed the kitchen valve and left the tools on the counter before leaving.",
-        "my roommate baked a spicy vegetable pizza while i vacuumed the kitchen floor.",
-        "he grabbed his keys and jacket, then jogged over to the next building.",
-        "the bakery next to the quad opens very early and serves excellent coffee.",
-        "we kept a record of every expense and split the grocery bill evenly.",
-        "the delivery van arrived two days late, but every item was carefully packed.",
-        "she kept a journal and wrote vivid notes every quiet evening before bed.",
-        "the morning light moved across the kitchen and brightened every dark corner.",
-        "a warm breeze moved across the lake just before the sky went dark.",
-        "the bus service was revised after the holiday, leaving quite a few riders confused.",
-        "he fixed the leaky valve using just a wrench and a bit of extra tape.",
-        "the kids drew vivid pictures and colored every page with bright markers.",
-        "we stopped to check the map and kept track of every fork in the trail.",
-        "she revised her key points and practiced her speech every morning before work.",
-        "the valley trail winds through pine forests and ends at a rocky overlook.",
-        "the jazz venue hosted a live event just before it closed for the week.",
-        "the lake was very quiet just before the kayakers arrived at dawn.",
-        "every volunteer organized each garden zone and kept the flowers watered all week.",
-        "we grilled fresh vegetables and served them with a zesty lemon dressing.",
-        "the bridge was closed for repairs, so every driver took a longer route.",
-        "she left her jacket on the chair and forgot to take the key with her.",
-        "the venue was booked until five, so we moved the meeting to a nearby cafe.",
-        "we watched the squirrels race across the vivid green park near the clock tower.",
+    static let corpusSets: [[String]] = [
+        // MARK: Set 1 — Academic & Campus
+        [
+            "jake reviewed his notes for the quiz and kept every key term on a single index card.",
+            "the professor asked a very quick question about voltage and the class gave a clear answer.",
+            "zoe fixed the display settings and moved the extra keyboard to a shelf beside the desk.",
+            "we organized the project files by size, joined the call, and gave an update to the team.",
+            "she solved the complex equation quite quickly and explained every step to the junior group.",
+            "kevin took the job back in january and kept a very detailed log of every task since then.",
+            "the exam had six questions covering a broad mix of topics from the required reading list.",
+            "she revised her draft and realized the conclusion needed a stronger, more vivid final line.",
+            "both professors put the problem on the board and asked us to work through it before class.",
+            "the study group met every morning to review the material before the big midterm.",
+            "my plan was to finish the chapter, but i spent more time on the problems than expected.",
+            "she printed five copies of the report and passed them out at the beginning of the meeting.",
+            "the faculty board approved the new building plan and gave the final go-ahead by friday.",
+            "we worked through four problems before the professor stopped and moved to the next section.",
+            "most of the work was done in the first few weeks, well before every final submission was due.",
+            "the feedback from every group member was carefully written and submitted before the deadline.",
+            "you should back up your work, review every draft, and bring a printed copy to the group meeting.",
+            "the professor reminded every student to bring a fully charged laptop and a backup power supply.",
+            "he put together a very brief summary of the main points and posted it to the class webpage.",
+            "we mapped out the project timeline, divided responsibilities, and set a firm deadline for each part.",
+            "after the quiz, she stepped outside for a very brief walk before her next seminar began.",
+            "by comparing both methods, the group found the most effective problem-solving approach.",
+            "the building lobby was very busy with students preparing for their morning presentations.",
+            "she borrowed three books from the library and reviewed every chapter between afternoon classes.",
+            "the most effective approach was to break the problem into smaller parts and solve each one in turn.",
+            "kevin checked his weekly notebook and marked each key task with a quick tick before moving on.",
+        ],
 
-        // MARK: Apostrophe sentences (adjacent-key error data)
-        "i don't think she's planning to move to a new job quite yet.",
-        "it's been a very long week, but we've kept every task on track.",
-        "he couldn't find the key, so he checked every jacket pocket very carefully.",
-        "she didn't expect the quiz to cover six vocabulary units in one exam.",
-        "i've just realized i haven't reviewed the final version of the document.",
-        "we're not quite finished, but we've covered every key section already.",
-        "the store wasn't stocking the exact flavor, so we picked a very close option.",
-        "he'd already locked the van, but she asked him to check the back seat.",
+        // MARK: Set 2 — Nature & Outdoors
+        [
+            "the frozen peaks gave the valley a quiet, vivid quality that jack had never seen before.",
+            "zach hiked to the lake at zero degrees and kept a journal of every bird spotted along the path.",
+            "we drove the extra van quickly along the river road and stopped just before the old bridge.",
+            "she visited six unique zones in the forest and took very careful notes along the trail.",
+            "the ranger asked every visitor to keep to the marked path and avoid the frozen creek.",
+            "the expedition required six days of planning, and zach gave the whole team a very clear map.",
+            "jake found a quiet spot by the rocks and relaxed for the rest of a very warm afternoon.",
+            "they kayaked across the calm bay and joked that every kilometer felt like a quick victory.",
+            "both trails were beautiful but the upper path offered a better view of the surrounding peaks.",
+            "before setting off, we packed breakfast, filled every water bottle, and put on fresh sunblock.",
+            "the brown bear moved between the pines and disappeared behind a big cluster of boulders.",
+            "big birds circled above the cliffs, probably looking for fish below the surface of the river.",
+            "we built a small fire over the rocks beside the stream and boiled water for morning coffee.",
+            "the map showed a broad flat plain beyond the forest, about five miles from the base camp.",
+            "by the time the group reached the summit, most of the morning fog had blown away completely.",
+            "the forest floor was thick with fallen branches, making progress slow but very rewarding.",
+            "she photographed every plant species she found, from bright yellow flowers to brown mossy logs.",
+            "the broken path forced the group to scramble over boulders before reaching the open ridge.",
+            "we camped beside a wide bend in the river and watched the bright stars from our sleeping bags.",
+            "the morning was perfect for hiking, with a bright blue sky and a warm but gentle wind.",
+            "every step brought new sounds and smells, from pine resin to fresh mud by the stream bank.",
+            "the birds were most active just before dawn, filling the valley below with a rich layered sound.",
+            "we followed the slope down to a broad meadow where grazing deer moved slowly through the grass.",
+            "the weather changed very quickly, so we put up every tent before the first drops of rain fell.",
+            "a long climb brought us above the treeline, where the wide view opened up across the whole basin.",
+        ],
 
-        // MARK: Sentences with heavy rare-letter coverage
-        "jack quickly zipped his jacket, joined the queue, and left the building.",
-        "the exhibit mixed vintage jazz recordings with old photographs and wax figures.",
-        "quinn solved the complex equation and explained every step to the review group.",
-        "every student received a revised version of the exam and kept a copy on file.",
-        "xavier asked if the extra package had arrived and whether the valve was intact.",
-        "zach packed six textbooks into his backpack and locked the dorm before leaving.",
-        "jenny sent six vivid photographs from the quiet coastal village to her family.",
-        "the judge reviewed each objection very quickly and moved the case forward.",
-        "my colleague wore a black jacket and packed extra voltage converters for the trip.",
-        "her younger brother plays the saxophone in the jazz quartet every weekend.",
-        "both students checked the quiz and reviewed every exam section before leaving.",
-        "we packed fresh fruit, six juice boxes, and a very large vegetable wrap.",
-        "the volunteer fixed the broken projector just before the keynote speech began.",
+        // MARK: Set 3 — Food & Social
+        [
+            "zoe made a very quick batch of vegetable soup and shared it with the neighbors next door.",
+            "jake grilled six skewers of chicken and kept the extra sauce in a jar beside the grill.",
+            "the jazz brunch at the hotel gave every visitor a welcome drink and a small gift box.",
+            "she asked jake a quick question about the vegan options and quietly jotted the best items down.",
+            "kevin brought six boxes of fruit from the market and stacked them in the kitchen corner.",
+            "we joined to mix vivid sauces into the stew, tasted each one, and adjusted the flavor every time.",
+            "zach drove to the juice bar, ordered the largest size, and sat near the front window.",
+            "the quality of the event depended on how quickly every vendor had set up before guests arrived.",
+            "both the bread and the pastry were baked fresh that morning, and neither was available by noon.",
+            "she boiled the pasta, browned the butter, and brought everything to the table before the guests sat.",
+            "the farmers brought big baskets of vegetables, berries, and fresh herbs to the saturday morning market.",
+            "the barbecue beside the community building drew about fifty people from the surrounding neighborhood.",
+            "we bought fresh fish, bright herbs, and ripe potatoes from the stall beside the park entrance.",
+            "the warm bread was probably baked less than an hour before the shop opened, and it went fast.",
+            "by the end of the meal, everybody had put their plates back and helped to clear the big table.",
+            "the big pot of beans was perfect for a cold afternoon, and people kept coming back for more.",
+            "she prepared a beautiful platter of melon, berries, and sliced peaches for the garden party.",
+            "before the buffet opened, the manager briefly explained the full plan for the evening to every staff member.",
+            "the whole group brought something to share, from homemade bread to bottles of sparkling water.",
+            "people began to fill the square around noon, drawn by the smell of fresh bread and roasting spices.",
+            "the market stays very busy from early morning until about three in the afternoon every day.",
+            "by making small batches, the baker kept everything fresh and never let supply fall behind demand.",
+            "a long table was set up beneath the trees, and people served themselves from wide bowls and big platters.",
+            "the best part about the potluck was how many different dishes people brought from their own families.",
+            "we booked a table for eight, but the place was so popular that we almost did not get a spot.",
+            "kevin cooked a savory vegetable mix and served every bowl with a very vivid garnish on top.",
+        ],
 
-        // MARK: Questions
-        "did you save a backup of every version before you closed the project file?",
-        "can you pick up some milk and check if the bakery has any fresh rolls?",
-        "have you reviewed the key vocabulary from the first six chapters yet?",
-        "do you know if the exam will cover just the vocabulary from unit five?",
-        "is there a quick fix for the broken valve before the review session starts?",
-        "could you check whether the jazz venue is still open on sunday evenings?",
-        "did xavier mention the project deliverables or the revised timeline at the meeting?",
-        "would you like to review the key objectives before we submit the final version?",
+        // MARK: Set 4 — Tech & Problem Solving
+        [
+            "jake traced the exact bug, zeroed in on the issue, and fixed it before the review session.",
+            "the quiz app required students to solve each problem quickly before viewing the next screen.",
+            "zoe validated the data set, joined the team call, and organized each result into five categories.",
+            "kevin found a very quick fix and gave the whole team a clear update on the key changes.",
+            "the complex analysis required quite a lot of extra effort from every junior engineer.",
+            "she gave a vivid demo and explained exactly how the job was solved in just three steps.",
+            "the server crash was tracked back to a broken task in the job queue that nobody had reviewed.",
+            "we fixed six data integrity bugs and ensured zero broken links across every live zone.",
+            "both the frontend and backend teams worked through the problem carefully before the big deployment.",
+            "the bug report described a broken form that blocked people from submitting their payment details.",
+            "before shipping the update, every build was tested on multiple browsers and device types.",
+            "by reviewing the base configuration, the team found a subtle problem in the boot sequence.",
+            "the project board showed that about half the tasks were blocked by a missing dependency.",
+            "a bad pointer in the library caused a memory overflow that brought down the backup service.",
+            "the team rebuilt the pipeline from scratch because the previous build process was too brittle.",
+            "debugging was slow at first, but the team made good progress once they broke the problem apart.",
+            "the brief downtime gave the team a chance to review the deployment plan and fix minor gaps.",
+            "we published the patch, updated the branch, and notified every affected subscriber by email.",
+            "the build failed because a library had been removed from the public package repository.",
+            "before the final merge, the team ran a complete test suite covering both new and old behavior.",
+            "the backup system ran every night, but nobody had verified that the restore process still worked.",
+            "a subtle bug was found by reviewing every branch that had been modified in the past week.",
+            "the problem turned out to be a missing bracket in a block of code that nobody had touched.",
+            "by being more precise about memory allocation, the team brought peak usage below acceptable limits.",
+            "the update required every subscriber to reset their password before they could log back in.",
+            "the team kept a working knowledge base and made sure every key workflow was clearly documented.",
+        ],
 
-        // MARK: Commands
-        "check your work, save a backup copy, and close every extra tab you have open.",
-        "lock the door, close every window, and leave the key on the kitchen table.",
-        "save your work, back up every file, and shut down before you leave for the evening.",
-        "check the weather forecast and bring a jacket if you're leaving after six.",
-        "jot down the exact question, note the key details, and review your sources.",
-        "keep your journal, a water bottle, and your student id in your jacket pocket.",
-        "send the revised draft to every team member and ask for feedback by friday.",
-        "make sure the volume is low and switch off every extra light before leaving.",
-
-        // MARK: Compound and contrast sentences
-        "the venue was very busy, but the event coordinator kept everything moving well.",
-        "she expected an easy quiz, yet the questions covered six complex vocabulary topics.",
-        "he took the shortcut across the park, but it added extra time to the journey.",
-        "the plan looked solid at first, but we revised every key section before submitting.",
-        "the event was small, yet the keynote left a very vivid impression on everyone.",
-        "the quiz was short, but it covered vocabulary from six very different units.",
+        // MARK: Set 5 — Travel & Errands
+        [
+            "jake jumped on the early train and made it to the visa office just before the doors closed.",
+            "zach packed six bags for the trip, checked every zipper twice, and locked the front door.",
+            "the taxi queue moved very slowly, so she decided to walk the next five blocks instead.",
+            "kevin drove across the valley and stopped to fix a small but critical problem with the axle.",
+            "she gave the hotel a quick call to confirm the booking and ask about the extra parking fee.",
+            "the express bus stopped at six zones before reaching the quiet junction near the harbor.",
+            "we visited the jazz district, explored every street, and took vivid photos of the old buildings.",
+            "zoe asked for an exact price quote on the job and kept copies of every required document.",
+            "both bridges were blocked by traffic, so the driver took a back road through the outer suburbs.",
+            "before boarding the bus, she bought a water bottle, a snack bar, and a brief travel guide.",
+            "the big ferry was already pulling away from the berth when we arrived at the boat terminal.",
+            "by the time we found a parking spot, most of the shops on the main street had begun to close.",
+            "the bus broke down about three blocks from the station, so everybody had to walk the rest of the way.",
+            "a bright billboard above the bridge described the public transport options between the two cities.",
+            "we brought our biggest bags but still barely fit everything into the cabin storage above our seats.",
+            "the bags were checked at the border, and one was briefly held because of a broken zipper.",
+            "by booking both legs of the trip together, we saved a good amount on the total travel budget.",
+            "the brief layover in the connecting city gave us enough time to grab a bite and buy a few things.",
+            "the building beside the bus terminal had a bright sign with the schedule posted below the lobby clock.",
+            "before leaving the country, she brought her passport to the correct bureau and renewed it in person.",
+            "the boat bobbed gently at the dock, and the crew began loading the bigger cargo before sunrise.",
+            "a broken signal light at the main bridge caused backups stretching almost all the way to the bypass.",
+            "we bought breakfast from a small bakery beside the hotel and ate it on a bench in the courtyard.",
+            "by checking the board at the station, she found a much faster route that saved about forty minutes.",
+            "the group booked three adjoining rooms and brought everything they needed for a five-day stay.",
+            "the small museum near the market was warm and welcoming, with many rooms of modern maritime photography.",
+            "moving between terminals involved a very vivid overhead map and a moving walkway by the main entrance.",
+        ],
     ]
 
-    /// Returns `sentenceCount` shuffled sentences joined by spaces.
+    /// The corpus selected for the current session. Call `selectRandomCorpus()` at session start.
+    static var currentCorpus: [String] = corpusSets[0]
+
+    /// Randomly picks one of the corpus sets for this session.
+    static func selectRandomCorpus() {
+        currentCorpus = corpusSets.randomElement() ?? corpusSets[0]
+    }
+
+    /// Returns `count` shuffled sentences from the current corpus joined by spaces.
     static func randomSentences(count: Int) -> String {
-        var pool = sentencePool.shuffled()
+        var pool = currentCorpus.shuffled()
         var result: [String] = []
         var idx = 0
         for _ in 0..<count {
             result.append(pool[idx % pool.count])
             idx += 1
-            if idx == pool.count { pool = sentencePool.shuffled() }
+            if idx == pool.count { pool = currentCorpus.shuffled() }
         }
         return result.joined(separator: " ")
     }

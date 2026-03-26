@@ -28,10 +28,11 @@ final class TapCoordPDFExporter {
         let kbOriginY = taps.map { $0.keyScreenY }.min()!
 
         // Each tap's position relative to keyboard top-left
-        let coords: [(x: Double, y: Double, key: String, isCorrect: Bool)] = taps.map { e in
+        let coords: [(x: Double, y: Double, key: String, expectedChar: String, isCorrect: Bool)] = taps.map { e in
             (x: e.keyScreenX + e.tapLocalX - kbOriginX,
              y: e.keyScreenY + e.tapLocalY - kbOriginY,
              key: e.keyLabel,
+             expectedChar: e.expectedChar,
              isCorrect: e.isCorrect)
         }
 
@@ -142,7 +143,7 @@ final class TapCoordPDFExporter {
 
     private func drawScatterPlot(
         ctx: UIGraphicsPDFRendererContext,
-        coords: [(x: Double, y: Double, key: String, isCorrect: Bool)],
+        coords: [(x: Double, y: Double, key: String, expectedChar: String, isCorrect: Bool)],
         maxX: Double,
         maxY: Double,
         topY: CGFloat
@@ -238,7 +239,8 @@ final class TapCoordPDFExporter {
             let py = plotTop  + CGFloat(c.y / maxY) * plotH
             let dotRect = CGRect(x: px - dotR, y: py - dotR,
                                  width: dotR * 2, height: dotR * 2)
-            cgCtx.setFillColor(keyColor(c.key).cgColor)
+            let colorKey = c.expectedChar.isEmpty ? c.key : c.expectedChar
+            cgCtx.setFillColor(keyColor(colorKey).cgColor)
             cgCtx.fillEllipse(in: dotRect)
         }
 
@@ -319,10 +321,10 @@ final class TapCoordPDFExporter {
                            "z","x","c","v","b","n","m","space","delete"]
 
     private func keyColor(_ key: String) -> UIColor {
-        let idx   = Double(allKeys.firstIndex(of: key) ?? 0)
-        let count = Double(allKeys.count)
-        let hue   = (idx / count * 0.82 + 0.05).truncatingRemainder(dividingBy: 1.0)
-        return UIColor(hue: CGFloat(hue), saturation: 0.78, brightness: 0.75, alpha: 0.85)
+        let idx = Double(allKeys.firstIndex(of: key) ?? 0)
+        let hue = (idx * 0.618033988749895).truncatingRemainder(dividingBy: 1.0)
+        let sat: CGFloat = idx.truncatingRemainder(dividingBy: 2) == 0 ? 0.82 : 0.65
+        return UIColor(hue: CGFloat(hue), saturation: sat, brightness: 0.85, alpha: 0.85)
     }
 
     private func hasCoords(_ e: InputEventData) -> Bool {
