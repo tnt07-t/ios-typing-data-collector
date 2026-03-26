@@ -40,7 +40,7 @@ struct CustomKeyboardView: View {
             let topPad: CGFloat = max(8, geo.size.height - usedH)
 
             ZStack(alignment: .bottom) {
-                // Key rows — aligned to top, leaving natural free space at the bottom
+                // Key rows — aligned to top
                 VStack(spacing: rowGap) {
                     if showNumeric {
                         numericRows(geo: geo, kw: kw, sp: sp, keyH: keyH)
@@ -51,14 +51,15 @@ struct CustomKeyboardView: View {
                 .padding(.horizontal, sidePad)
                 .padding(.top, topPad)
                 .padding(.bottom, bottomPad)
-                .frame(width: geo.size.width, alignment: .top)
+                .frame(width: geo.size.width, height: geo.size.height, alignment: .top)
 
-                // Globe & mic — float in the free space below the last key row
+                // Globe & mic anchored to the bottom of the full keyboard frame
                 globeMicBar(colorScheme: colorScheme, sidePad: sidePad)
                     .frame(width: geo.size.width)
                     .padding(.bottom, 6)
                     .allowsHitTesting(false)
             }
+            .frame(width: geo.size.width, height: geo.size.height)
             .background(kbBg)
         }
     }
