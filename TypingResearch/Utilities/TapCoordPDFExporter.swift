@@ -215,12 +215,13 @@ final class TapCoordPDFExporter {
             c.strokePath()
 
             let display  = keyDisplay(key)
-            let fontSize = max(4.5, kh * 0.38)
+            let fontSize = max(5, kh * 0.38)
             let textW    = max(kw - 4, 10)
+            // Bottom-left corner so tap dots drawn later don't obscure the label
             drawText(display,
-                     at: CGPoint(x: kx + (kw - textW) / 2, y: ky + (kh - fontSize) / 2 - 1),
-                     font: .systemFont(ofSize: fontSize, weight: .light),
-                     color: .label, width: textW, centered: true)
+                     at: CGPoint(x: kx + 2, y: ky + kh - fontSize - 2),
+                     font: .systemFont(ofSize: fontSize, weight: .medium),
+                     color: UIColor.label.withAlphaComponent(0.65), width: textW)
         }
 
         // ── Axis lines (drawn over keyboard, under dots) ──────────────────────
@@ -255,18 +256,31 @@ final class TapCoordPDFExporter {
         c.setLineWidth(0.8)
         c.stroke(CGRect(x: ox, y: oy, width: kbPdfW, height: kbPdfH))
 
-        // ── Tap dots ──────────────────────────────────────────────────────────
+        // ── Tap dots (colored by correct=green / incorrect=red) ───────────────
         let dotR: CGFloat = 3.5
         for coord in coords {
             let px = ox + CGFloat(coord.x) * scale
             let py = oy + CGFloat(coord.y) * scale
-            let dotRect = CGRect(x: px - dotR, y: py - dotR, width: dotR*2, height: dotR*2)
-            let colorKey = coord.expectedChar.isEmpty ? coord.key : coord.expectedChar
-            c.setFillColor(keyColor(colorKey).withAlphaComponent(0.85).cgColor)
+            let haloRect = CGRect(x: px - dotR - 1, y: py - dotR - 1,
+                                  width: (dotR+1)*2, height: (dotR+1)*2)
+            let dotRect  = CGRect(x: px - dotR, y: py - dotR, width: dotR*2, height: dotR*2)
+
+            // White halo for contrast
+            c.setFillColor(UIColor.white.withAlphaComponent(0.80).cgColor)
+            c.fillEllipse(in: haloRect)
+
+            let dotColor: UIColor = coord.isCorrect ? .systemGreen : .systemRed
+            c.setFillColor(dotColor.withAlphaComponent(0.88).cgColor)
             c.fillEllipse(in: dotRect)
-            c.setStrokeColor(UIColor.white.withAlphaComponent(0.6).cgColor)
-            c.setLineWidth(0.5)
-            c.strokeEllipse(in: dotRect)
+
+            // Expected char label in white inside the dot
+            let label = coord.expectedChar.isEmpty ? coord.key : coord.expectedChar
+            if label.count == 1 {
+                drawText(label,
+                         at: CGPoint(x: px - dotR + 0.5, y: py - dotR * 0.85),
+                         font: .monospacedSystemFont(ofSize: dotR * 1.1, weight: .bold),
+                         color: .white, width: dotR * 2, centered: true)
+            }
         }
 
         // ── Axis tick labels ──────────────────────────────────────────────────
@@ -322,21 +336,23 @@ final class TapCoordPDFExporter {
         c.restoreGState()
 
         // ── Legend ────────────────────────────────────────────────────────────
-        let legendKeys = ["q","w","e","r","t","y","u","i","o","p",
-                          "a","s","d","f","g","h","j","k","l",
-                          "z","x","c","v","b","n","m","space","delete"]
-        var lx = ox
         let ly = oy + kbPdfH + 26
-        for k in legendKeys {
-            c.setFillColor(keyColor(k).cgColor)
-            c.fillEllipse(in: CGRect(x: lx, y: ly, width: 6, height: 6))
-            let label = k == "space" ? "sp" : k == "delete" ? "del" : k
-            drawText(label, at: CGPoint(x: lx + 8, y: ly - 1),
-                     font: .monospacedSystemFont(ofSize: 6.5, weight: .regular),
-                     color: .secondaryLabel, width: 22)
-            lx += 20
-            if lx + 20 > ox + kbPdfW { break }
-        }
+        let correctCount   = coords.filter { $0.isCorrect }.count
+        let incorrectCount = coords.filter { !$0.isCorrect }.count
+
+        c.setFillColor(UIColor.systemGreen.cgColor)
+        c.fillEllipse(in: CGRect(x: ox, y: ly, width: 7, height: 7))
+        drawText("correct (\(correctCount))",
+                 at: CGPoint(x: ox + 10, y: ly - 1),
+                 font: .monospacedSystemFont(ofSize: 7, weight: .regular),
+                 color: .secondaryLabel, width: 80)
+
+        c.setFillColor(UIColor.systemRed.cgColor)
+        c.fillEllipse(in: CGRect(x: ox + 96, y: ly, width: 7, height: 7))
+        drawText("incorrect (\(incorrectCount))",
+                 at: CGPoint(x: ox + 106, y: ly - 1),
+                 font: .monospacedSystemFont(ofSize: 7, weight: .regular),
+                 color: .secondaryLabel, width: 90)
     }
 
     // MARK: - Coordinate Table

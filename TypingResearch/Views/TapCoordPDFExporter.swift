@@ -328,7 +328,7 @@ final class TapCoordPDFExporter {
     }
 
     private func hasCoords(_ e: InputEventData) -> Bool {
-        !(e.tapNormX == 0 && e.tapNormY == 0 && e.tapLocalX == 0 && e.tapLocalY == 0)
+        e.keyWidth > 0
     }
 
     private func drawText(

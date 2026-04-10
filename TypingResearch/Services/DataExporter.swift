@@ -2,52 +2,7 @@ import Foundation
 
 final class DataExporter {
 
-    // MARK: - CSV Export
-
-    func exportEventsCSV(
-        session: Session,
-        trials: [Trial],
-        participant: Participant?
-    ) -> URL? {
-        var rows: [String] = []
-
-        // Header
-        rows.append([
-            "session_id", "participant_id", "participant_first", "participant_last",
-            "trial_id", "trial_index", "target_text", "final_text",
-            "trial_duration_ms", "trial_accuracy", "trial_wpm", "trial_cps",
-            "trial_backspaces", "trial_inserts", "correct_chars", "total_target_chars"
-        ].joined(separator: ","))
-
-        for trial in trials {
-            let row: [String] = [
-                session.id.uuidString,
-                session.participantId.uuidString,
-                csvEscape(participant?.firstName ?? ""),
-                csvEscape(participant?.lastName ?? ""),
-                trial.id.uuidString,
-                "\(trial.trialIndex)",
-                csvEscape(trial.targetText),
-                csvEscape(trial.finalText),
-                String(format: "%.2f", trial.durationMs),
-                String(format: "%.4f", trial.accuracy),
-                String(format: "%.2f", trial.wpm),
-                String(format: "%.4f", trial.charsPerSecond),
-                "\(trial.backspaceCount)",
-                "\(trial.insertCount)",
-                "\(trial.correctChars)",
-                "\(trial.totalTargetChars)"
-            ]
-            rows.append(row.joined(separator: ","))
-        }
-
-        return writeToTempFile(
-            content: rows.joined(separator: "\n"),
-            filename: "session_\(session.id.uuidString).csv"
-        )
-    }
-
-    // MARK: - Keystroke CSV Export (per-event, for heatmap analysis)
+    // MARK: - Keystroke CSV Export
 
     func exportKeystrokesCSV(
         session: Session,
@@ -57,121 +12,51 @@ final class DataExporter {
         var rows: [String] = []
 
         rows.append([
-            // Identity
-            "participant_first", "participant_last", "participant_id",
-            // Key & tap coordinates
+            "participant_first", "participant_last", "session_id",
             "event_type", "key_label",
-            "tap_local_x", "tap_local_y", "tap_norm_x", "tap_norm_y",
-            "key_screen_x", "key_screen_y", "key_width", "key_height",
-            // Correctness
-            "expected_char", "actual_char", "is_correct",
-            // Text context
-            "replacement_string", "range_start", "range_length",
-            "text_before", "text_after",
-            // Time (rightmost)
+            "tap_local_x", "tap_local_y",
+            "key_width", "key_height",
+            "key_row", "key_col",
+            "expected_char", "actual_char", "corrected_char", "is_correct",
+            "previous_key_label",
+            "text_before",
             "timestamp_ms", "inter_key_interval_ms"
         ].joined(separator: ","))
 
         let sessionStart = session.startedAt
 
         for event in events {
+            let keyColStr   = event.keyCol.map { "\($0)" } ?? ""
+            let isCorrectStr = event.eventType == .delete ? "" : (event.isCorrect ? "1" : "0")
             let row: [String] = [
                 csvEscape(participant?.firstName ?? ""),
-                csvEscape(participant?.lastName ?? ""),
-                csvEscape(session.participantId.uuidString),
+                csvEscape(participant?.lastName  ?? ""),
+                csvEscape(event.sessionId.uuidString),
                 csvEscape(event.eventType.rawValue),
                 csvEscape(event.keyLabel),
                 String(format: "%.4f", event.tapLocalX),
                 String(format: "%.4f", event.tapLocalY),
-                String(format: "%.6f", event.tapNormX),
-                String(format: "%.6f", event.tapNormY),
-                String(format: "%.4f", event.keyScreenX),
-                String(format: "%.4f", event.keyScreenY),
                 String(format: "%.4f", event.keyWidth),
                 String(format: "%.4f", event.keyHeight),
+                csvEscape(event.keyRow),
+                keyColStr,
                 csvEscape(event.expectedChar),
                 csvEscape(event.actualChar),
-                event.isCorrect ? "1" : "0",
-                csvEscape(event.replacementString),
-                "\(event.rangeStart)",
-                "\(event.rangeLength)",
+                csvEscape(event.correctedChar),
+                isCorrectStr,
+                csvEscape(event.previousKeyLabel),
                 csvEscape(event.textBefore),
-                csvEscape(event.textAfter),
                 String(format: "%.3f", event.timestamp.timeIntervalSince(sessionStart) * 1000),
                 String(format: "%.3f", event.interKeyIntervalMs)
             ]
             rows.append(row.joined(separator: ","))
         }
 
+        let first = participant?.firstName ?? "unknown"
+        let last  = participant?.lastName  ?? "unknown"
         return writeToTempFile(
             content: rows.joined(separator: "\n"),
-            filename: "keystrokes_\(session.id.uuidString).csv"
-        )
-    }
-
-    // MARK: - JSON Export
-
-    func exportSessionJSON(
-        session: Session,
-        trials: [Trial],
-        participant: Participant?
-    ) -> URL? {
-        var dict: [String: Any] = [:]
-
-        dict["session_id"] = session.id.uuidString
-        dict["participant_id"] = session.participantId.uuidString
-        dict["started_at"] = ISO8601DateFormatter().string(from: session.startedAt)
-        dict["ended_at"] = session.endedAt.map { ISO8601DateFormatter().string(from: $0) } as Any
-        dict["total_trials"] = session.totalTrials
-        dict["completed_trials"] = session.completedTrials
-        dict["mean_accuracy"] = session.meanAccuracy
-        dict["mean_chars_per_second"] = session.meanCharsPerSecond
-        dict["total_backspaces"] = session.totalBackspaces
-
-        if let p = participant {
-            dict["participant"] = [
-                "id": p.id.uuidString,
-                "first_name": p.firstName,
-                "last_name": p.lastName,
-                "age": p.age as Any,
-                "dominant_hand": p.dominantHand.rawValue,
-                "device_model": p.deviceModel,
-                "system_version": p.systemVersion,
-                "screen_width_pt": p.screenWidthPt,
-                "screen_height_pt": p.screenHeightPt,
-                "app_version": p.appVersion
-            ] as [String: Any]
-        }
-
-        dict["trials"] = trials.map { trial -> [String: Any] in
-            [
-                "id": trial.id.uuidString,
-                "trial_index": trial.trialIndex,
-                "target_text": trial.targetText,
-                "final_text": trial.finalText,
-                "started_at": ISO8601DateFormatter().string(from: trial.startedAt),
-                "ended_at": trial.endedAt.map { ISO8601DateFormatter().string(from: $0) } as Any,
-                "duration_ms": trial.durationMs,
-                "backspace_count": trial.backspaceCount,
-                "insert_count": trial.insertCount,
-                "correct_chars": trial.correctChars,
-                "total_target_chars": trial.totalTargetChars,
-                "accuracy": trial.accuracy,
-                "chars_per_second": trial.charsPerSecond,
-                "wpm": trial.wpm
-            ]
-        }
-
-        guard let data = try? JSONSerialization.data(
-            withJSONObject: dict,
-            options: [.prettyPrinted, .sortedKeys]
-        ) else {
-            return nil
-        }
-
-        return writeToTempFile(
-            data: data,
-            filename: "session_\(session.id.uuidString).json"
+            filename: "keystrokes_\(first)_\(last).csv"
         )
     }
 

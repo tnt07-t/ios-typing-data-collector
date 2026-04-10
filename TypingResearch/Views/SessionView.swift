@@ -36,8 +36,6 @@ struct SummaryView: View {
     var sessionManager: SessionManager
     @State private var shareItem: ShareItem? = nil
     @State private var showResetConfirm: Bool = false
-    @State private var isGeneratingReport: Bool = false
-    @State private var isGeneratingCoordPDF: Bool = false
     @State private var isGeneratingKeyboardView: Bool = false
     @State private var plotLayout: TapDotPlotView.LayoutMode = .alpha
 
@@ -135,35 +133,12 @@ struct SummaryView: View {
     private var exportButtons: some View {
         VStack(spacing: 12) {
 
-            Button(action: exportKeyReport) {
-                HStack {
-                    if isGeneratingReport {
-                        ProgressView().tint(.white).padding(.trailing, 4)
-                    } else {
-                        Image(systemName: "chart.scatter")
-                    }
-                    Text(isGeneratingReport ? "Generating\u{2026}" : "Export Per-Key Tap Report (PDF)")
-                }
-                .frame(maxWidth: .infinity).padding()
-                .background(Color.orange)
-                .foregroundColor(.white).cornerRadius(10)
+            Button(action: exportKeystrokes) {
+                Label("Export Keystrokes CSV", systemImage: "keyboard")
+                    .frame(maxWidth: .infinity).padding()
+                    .background(Color(.systemGray5))
+                    .foregroundColor(.primary).cornerRadius(10)
             }
-            .disabled(isGeneratingReport)
-
-            Button(action: exportCoordPDF) {
-                HStack {
-                    if isGeneratingCoordPDF {
-                        ProgressView().tint(.white).padding(.trailing, 4)
-                    } else {
-                        Image(systemName: "chart.dots.scatter")
-                    }
-                    Text(isGeneratingCoordPDF ? "Generating\u{2026}" : "Export Tap Coordinate Map (PDF)")
-                }
-                .frame(maxWidth: .infinity).padding()
-                .background(Color.indigo)
-                .foregroundColor(.white).cornerRadius(10)
-            }
-            .disabled(isGeneratingCoordPDF)
 
             Button(action: exportKeyboardViewPDF) {
                 HStack {
@@ -179,29 +154,6 @@ struct SummaryView: View {
                 .foregroundColor(.white).cornerRadius(10)
             }
             .disabled(isGeneratingKeyboardView)
-
-            Divider()
-
-            Button(action: exportCSV) {
-                Label("Export Session CSV", systemImage: "doc.text")
-                    .frame(maxWidth: .infinity).padding()
-                    .background(Color(.systemGray5))
-                    .foregroundColor(.primary).cornerRadius(10)
-            }
-
-            Button(action: exportJSON) {
-                Label("Export Session JSON", systemImage: "doc.badge.gearshape")
-                    .frame(maxWidth: .infinity).padding()
-                    .background(Color(.systemGray5))
-                    .foregroundColor(.primary).cornerRadius(10)
-            }
-
-            Button(action: exportKeystrokes) {
-                Label("Export Keystrokes CSV", systemImage: "keyboard")
-                    .frame(maxWidth: .infinity).padding()
-                    .background(Color(.systemGray5))
-                    .foregroundColor(.primary).cornerRadius(10)
-            }
         }
         .sheet(item: $shareItem) { item in
             ShareSheet(activityItems: [item.url])
@@ -209,40 +161,6 @@ struct SummaryView: View {
     }
 
     // MARK: - Export Actions
-
-    private func exportKeyReport() {
-        guard let session = sessionManager.currentSession else { return }
-        isGeneratingReport = true
-        Task.detached(priority: .userInitiated) {
-            let exporter = KeyReportExporter()
-            let url = await exporter.exportPDF(
-                events: sessionManager.allEvents,
-                session: session,
-                participant: sessionManager.participant
-            )
-            await MainActor.run {
-                isGeneratingReport = false
-                if let url { shareItem = ShareItem(url: url) }
-            }
-        }
-    }
-
-    private func exportCoordPDF() {
-        guard let session = sessionManager.currentSession else { return }
-        isGeneratingCoordPDF = true
-        Task.detached(priority: .userInitiated) {
-            let exporter = TapCoordPDFExporter()
-            let url = await exporter.exportPDF(
-                events: sessionManager.allEvents,
-                session: session,
-                participant: sessionManager.participant
-            )
-            await MainActor.run {
-                isGeneratingCoordPDF = false
-                if let url { shareItem = ShareItem(url: url) }
-            }
-        }
-    }
 
     private func exportKeyboardViewPDF() {
         guard let session = sessionManager.currentSession else { return }
@@ -258,26 +176,6 @@ struct SummaryView: View {
                 isGeneratingKeyboardView = false
                 if let url { shareItem = ShareItem(url: url) }
             }
-        }
-    }
-
-    private func exportCSV() {
-        guard let session = sessionManager.currentSession else { return }
-        if let url = DataExporter().exportEventsCSV(
-            session: session,
-            trials: sessionManager.completedTrials,
-            participant: sessionManager.participant) {
-            shareItem = ShareItem(url: url)
-        }
-    }
-
-    private func exportJSON() {
-        guard let session = sessionManager.currentSession else { return }
-        if let url = DataExporter().exportSessionJSON(
-            session: session,
-            trials: sessionManager.completedTrials,
-            participant: sessionManager.participant) {
-            shareItem = ShareItem(url: url)
         }
     }
 
@@ -345,13 +243,15 @@ final class KeyboardViewPDFExporter {
         let validEvents = events.filter {
             !$0.keyLabel.isEmpty &&
             Set(row0 + row1 + row2 + ["space", "delete"]).contains($0.keyLabel) &&
-            !($0.tapNormX == 0 && $0.tapNormY == 0 && $0.tapLocalX == 0 && $0.tapLocalY == 0)
+            $0.keyWidth > 0
         }
         guard !validEvents.isEmpty else { return nil }
 
+        let first = participant?.firstName ?? "unknown"
+        let last  = participant?.lastName  ?? "unknown"
         let url = FileManager.default
             .temporaryDirectory
-            .appendingPathComponent("keyboard_view_\(session.id.uuidString).pdf")
+            .appendingPathComponent("keyboard_view_\(first)_\(last).pdf")
 
         let renderer = UIGraphicsPDFRenderer(
             bounds: CGRect(x: 0, y: 0, width: pageW, height: pageH)
@@ -377,13 +277,13 @@ final class KeyboardViewPDFExporter {
             let frames = buildFrames(ox: canvasLeft, plotTop: canvasTop,
                                      kw: kw, sp: sp, keyH: keyH, plotW: canvasW)
 
-            // ── Background (light mode) ─────────────────────────────────────────
-            cgCtx.setFillColor(UIColor(red: 0.816, green: 0.827, blue: 0.851, alpha: 1).cgColor)
+            // ── Background (dark mode) ─────────────────────────────────────────
+            cgCtx.setFillColor(UIColor(red: 0.07, green: 0.07, blue: 0.09, alpha: 1).cgColor)
             cgCtx.fill(CGRect(x: canvasLeft, y: canvasTop, width: canvasW, height: canvasH))
 
             // ── Normalized grid (0.00 → 1.00) ──────────────────────────────────
             let gridSteps: [CGFloat] = [0, 0.25, 0.5, 0.75, 1.0]
-            cgCtx.setStrokeColor(UIColor.black.withAlphaComponent(0.08).cgColor)
+            cgCtx.setStrokeColor(UIColor.white.withAlphaComponent(0.08).cgColor)
             cgCtx.setLineWidth(0.4)
 
             for t in gridSteps {
@@ -415,59 +315,73 @@ final class KeyboardViewPDFExporter {
             }
 
             // Canvas border
-            cgCtx.setStrokeColor(UIColor.separator.cgColor)
+            cgCtx.setStrokeColor(UIColor(white: 1, alpha: 0.20).cgColor)
             cgCtx.setLineWidth(0.6)
             cgCtx.stroke(CGRect(x: canvasLeft, y: canvasTop, width: canvasW, height: canvasH))
 
-            // ── Key outlines (light mode) ─────────────────────────────────────
+            // ── Key outlines (dark mode) ─────────────────────────────────────
             for (key, rect) in frames {
                 let isSpecial = key.count > 1
                 let keyPath = UIBezierPath(roundedRect: rect, cornerRadius: 5)
 
                 let fill: UIColor = isSpecial
-                    ? UIColor(red: 0.69, green: 0.71, blue: 0.73, alpha: 1)
-                    : .white
+                    ? UIColor(white: 0.18, alpha: 1)
+                    : UIColor(white: 0.26, alpha: 1)
                 cgCtx.setFillColor(fill.cgColor)
                 cgCtx.addPath(keyPath.cgPath); cgCtx.fillPath()
 
-                cgCtx.setStrokeColor(UIColor(white: 0, alpha: 0.10).cgColor)
-                cgCtx.setLineWidth(0.4)
+                cgCtx.setStrokeColor(UIColor(white: 1, alpha: 0.12).cgColor)
+                cgCtx.setLineWidth(0.5)
                 cgCtx.addPath(keyPath.cgPath); cgCtx.strokePath()
 
-                // Shadow under key
-                cgCtx.setStrokeColor(UIColor(white: 0, alpha: 0.25).cgColor)
-                cgCtx.setLineWidth(1.0)
-                cgCtx.move(to: CGPoint(x: rect.minX + 2, y: rect.maxY))
-                cgCtx.addLine(to: CGPoint(x: rect.maxX - 2, y: rect.maxY))
+                // Highlight top edge of key
+                cgCtx.setStrokeColor(UIColor(white: 1, alpha: 0.20).cgColor)
+                cgCtx.setLineWidth(0.7)
+                cgCtx.move(to: CGPoint(x: rect.minX + 3, y: rect.minY + 0.5))
+                cgCtx.addLine(to: CGPoint(x: rect.maxX - 3, y: rect.minY + 0.5))
                 cgCtx.strokePath()
 
-                // Key label — centered
+                // Key label — bottom-left corner so dots don't obscure it
                 let display = key == "delete" ? "\u{232B}" : key == "space" ? "\u{23B5}" : key
                 let fontSize: CGFloat = key.count > 1 ? 6 : max(5, keyH * 0.22)
-                drawTextCentered(display,
-                         in: rect,
-                         font: .systemFont(ofSize: fontSize, weight: .regular),
-                         color: UIColor(white: 0, alpha: 0.3))
+                drawText(display,
+                         at: CGPoint(x: rect.minX + 2, y: rect.maxY - fontSize - 3),
+                         font: .systemFont(ofSize: fontSize, weight: .medium),
+                         color: UIColor(white: 1, alpha: 0.70))
             }
 
-            // ── Tap dots (per-key normalized position) ──────────────────────────
-            let dotR: CGFloat = 3.5
+            // ── Tap dots (per-key color, white halo, intended char centered in dot)
+            let dotR: CGFloat = 4.5
             for e in validEvents {
                 guard let frame = frames[e.keyLabel] else { continue }
-                let normX = e.keyWidth > 0 ? e.tapLocalX / e.keyWidth : 0.5
+                let normX = e.keyWidth  > 0 ? e.tapLocalX / e.keyWidth  : 0.5
                 let normY = e.keyHeight > 0 ? e.tapLocalY / e.keyHeight : 0.5
                 let px = frame.minX + CGFloat(normX) * frame.width
                 let py = frame.minY + CGFloat(normY) * frame.height
 
                 let colorKey = e.expectedChar.isEmpty ? e.keyLabel : e.expectedChar
-                let color = keyUIColor(colorKey)
 
-                cgCtx.setFillColor(color.withAlphaComponent(0.85).cgColor)
+                // White halo for contrast
+                cgCtx.setFillColor(UIColor.white.withAlphaComponent(0.80).cgColor)
+                cgCtx.fillEllipse(in: CGRect(x: px - dotR - 1, y: py - dotR - 1,
+                                              width: (dotR+1)*2, height: (dotR+1)*2))
+
+                cgCtx.setFillColor(keyUIColor(colorKey).withAlphaComponent(0.95).cgColor)
                 cgCtx.fillEllipse(in: CGRect(x: px - dotR, y: py - dotR,
                                               width: dotR * 2, height: dotR * 2))
+
+                // Intended key label centered inside dot in white
+                let label = colorKey == "space" ? "\u{00B7}" : colorKey == "delete" ? "\u{232B}" : colorKey
+                if label.count == 1 {
+                    drawTextCentered(label,
+                                     in: CGRect(x: px - dotR, y: py - dotR * 0.9,
+                                                width: dotR * 2, height: dotR * 2),
+                                     font: .monospacedSystemFont(ofSize: dotR * 1.1, weight: .bold),
+                                     color: .white)
+                }
             }
 
-            // ── Legend ──────────────────────────────────────────────────────────
+            // ── Legend (per-key colors) ─────────────────────────────────────────
             let legendY = canvasTop + canvasH + 18
             let shownKeys = Array(Set(validEvents.map {
                 $0.expectedChar.isEmpty ? $0.keyLabel : $0.expectedChar

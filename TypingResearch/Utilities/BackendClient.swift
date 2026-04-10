@@ -67,43 +67,43 @@ struct KeystrokeRecord: Encodable {
     let studyId: String
     let participantId: String
     let sessionId: String
-    let trialId: String
+    let promptId: String
     let timestampISO: String
     let eventType: String
     let keyLabel: String
     let tapLocalX: Double
     let tapLocalY: Double
-    let tapNormX: Double
-    let tapNormY: Double
-    let keyScreenX: Double
-    let keyScreenY: Double
     let keyWidth: Double
     let keyHeight: Double
-    let interKeyIntervalMs: Double
-    let textAfter: String
+    let keyRow: String
+    let keyCol: Int?
     let expectedChar: String
     let actualChar: String
+    let correctedChar: String
+    let isCorrect: Bool
+    let previousKeyLabel: String
+    let interKeyIntervalMs: Double
 
     init(from event: InputEventData, sessionId: UUID, participantId: UUID, studyId: String) {
         let iso = ISO8601DateFormatter()
         self.studyId = studyId
         self.participantId = participantId.uuidString
         self.sessionId = sessionId.uuidString
-        self.trialId = event.trialId.uuidString
+        self.promptId = event.trialId.uuidString
         self.timestampISO = iso.string(from: event.timestamp)
         self.eventType = event.eventType.rawValue
         self.keyLabel = event.keyLabel
         self.tapLocalX = event.tapLocalX
         self.tapLocalY = event.tapLocalY
-        self.tapNormX = event.tapNormX
-        self.tapNormY = event.tapNormY
-        self.keyScreenX = event.keyScreenX
-        self.keyScreenY = event.keyScreenY
         self.keyWidth = event.keyWidth
         self.keyHeight = event.keyHeight
-        self.interKeyIntervalMs = event.interKeyIntervalMs
-        self.textAfter = event.textAfter
+        self.keyRow = event.keyRow
+        self.keyCol = event.keyCol
         self.expectedChar = event.expectedChar
         self.actualChar = event.actualChar
+        self.correctedChar = event.correctedChar
+        self.isCorrect = event.isCorrect
+        self.previousKeyLabel = event.previousKeyLabel
+        self.interKeyIntervalMs = event.interKeyIntervalMs
     }
 }

@@ -6,52 +6,42 @@ import Observation
 
 struct TapInfo {
     let keyLabel: String
-    let tapLocalX: Double
-    let tapLocalY: Double
-    let keyScreenX: Double
-    let keyScreenY: Double
+    let tapLocalX: Double   // tap x within key, in points from key left edge
+    let tapLocalY: Double   // tap y within key, in points from key top edge
     let keyWidth: Double
     let keyHeight: Double
 
-    var tapNormX: Double { keyWidth > 0 ? tapLocalX / keyWidth : 0 }
-    var tapNormY: Double { keyHeight > 0 ? tapLocalY / keyHeight : 0 }
-
-    static let none = TapInfo(
-        keyLabel: "",
-        tapLocalX: 0,
-        tapLocalY: 0,
-        keyScreenX: 0,
-        keyScreenY: 0,
-        keyWidth: 0,
-        keyHeight: 0
-    )
+    static let none = TapInfo(keyLabel: "", tapLocalX: 0, tapLocalY: 0, keyWidth: 0, keyHeight: 0)
 }
 
 // MARK: - InputEventData (transient, not SwiftData)
 
 struct InputEventData {
     let trialId: UUID
+    let sessionId: UUID
     let timestamp: Date
     let eventType: InputEventType
-    let replacementString: String
-    let rangeStart: Int
-    let rangeLength: Int
-    let textBefore: String
-    let textAfter: String
-    let expectedIndex: Int
-    let expectedChar: String
-    let actualChar: String
-    let isCorrect: Bool
-    let interKeyIntervalMs: Double
-    let tapLocalX: Double
-    let tapLocalY: Double
-    let tapNormX: Double
-    let tapNormY: Double
     let keyLabel: String
-    let keyScreenX: Double
-    let keyScreenY: Double
+    let tapLocalX: Double     // tap x within key, in points from key left edge
+    let tapLocalY: Double     // tap y within key, in points from key top edge
     let keyWidth: Double
     let keyHeight: Double
+    let keyRow: String        // "top" | "middle" | "bottom" | "space"
+    let keyCol: Int?          // column index; nil for space/delete/return
+    let expectedChar: String
+    let actualChar: String
+    let correctedChar: String // delete event: last char of textBefore; else ""
+    let isCorrect: Bool
+    let previousKeyLabel: String
+    let textBefore: String
+    let textAfter: String     // kept for liveTypedText tracking
+    let interKeyIntervalMs: Double
+
+    // Computed for legacy exporter compatibility (not exported to CSV)
+    var tapNormX: Double { keyWidth  > 0 ? tapLocalX / keyWidth  : 0.5 }
+    var tapNormY: Double { keyHeight > 0 ? tapLocalY / keyHeight : 0.5 }
+    var keyScreenX: Double { 0 }
+    var keyScreenY: Double { 0 }
 }
 
 // MARK: - SessionManager
@@ -87,6 +77,7 @@ final class SessionManager {
     // Internal
     private var trialStartTime: Date?
     private var lastEventTimestamp: Date?
+    private var lastKeyLabel: String = ""
     private var modelContext: ModelContext?
     private var sessionTimer: Timer?
     private var timerStarted: Bool = false
@@ -169,6 +160,7 @@ final class SessionManager {
         liveWPM = 0.0
         trialStartTime = Date()
         lastEventTimestamp = nil
+        lastKeyLabel = ""
         isTrialActive = true
     }
 
@@ -204,23 +196,19 @@ final class SessionManager {
             trialId: data.trialId,
             timestamp: data.timestamp,
             eventType: data.eventType,
-            replacementString: data.replacementString,
-            rangeStart: data.rangeStart,
-            rangeLength: data.rangeLength,
+            replacementString: "",
+            rangeStart: 0,
+            rangeLength: 0,
             textBefore: data.textBefore,
             textAfter: data.textAfter,
-            expectedIndex: data.expectedIndex,
+            expectedIndex: 0,
             expectedChar: data.expectedChar,
             actualChar: data.actualChar,
             isCorrect: data.isCorrect,
             interKeyIntervalMs: data.interKeyIntervalMs,
-            tapLocalX: data.tapLocalX,
-            tapLocalY: data.tapLocalY,
-            tapNormX: data.tapNormX,
-            tapNormY: data.tapNormY,
             keyLabel: data.keyLabel,
-            keyScreenX: data.keyScreenX,
-            keyScreenY: data.keyScreenY,
+            keyScreenX: 0,
+            keyScreenY: 0,
             keyWidth: data.keyWidth,
             keyHeight: data.keyHeight
         )
@@ -263,8 +251,8 @@ final class SessionManager {
         eventType: InputEventType,
         tapInfo: TapInfo
     ) -> InputEventData {
-        guard let trial = currentTrial else {
-            fatalError("No active trial")
+        guard let trial = currentTrial, let session = currentSession else {
+            fatalError("No active trial/session")
         }
 
         let now = Date()
@@ -279,7 +267,6 @@ final class SessionManager {
         let targetChars = Array(trial.targetText)
         let expectedIndex = rangeStart
 
-        // Backspace has no expected character — don't associate it with a target letter
         let expectedChar: String
         if eventType == .delete {
             expectedChar = ""
@@ -296,34 +283,71 @@ final class SessionManager {
             actualChar = ""
         }
 
-        // isCorrect: true only when the typed character matches the target.
-        // Delete events are excluded from accuracy — they carry no expected character.
         let isCorrect = eventType != .delete && !actualChar.isEmpty && actualChar == expectedChar
+
+        let correctedChar: String
+        if eventType == .delete && !textBefore.isEmpty {
+            correctedChar = String(textBefore.last!)
+        } else {
+            correctedChar = ""
+        }
+
+        let prevKeyLabel = lastKeyLabel
+        if !tapInfo.keyLabel.isEmpty {
+            lastKeyLabel = tapInfo.keyLabel
+        }
 
         return InputEventData(
             trialId: trial.id,
+            sessionId: session.id,
             timestamp: now,
             eventType: eventType,
-            replacementString: replacementString,
-            rangeStart: rangeStart,
-            rangeLength: rangeLength,
-            textBefore: textBefore,
-            textAfter: textAfter,
-            expectedIndex: expectedIndex,
-            expectedChar: expectedChar,
-            actualChar: actualChar,
-            isCorrect: isCorrect,
-            interKeyIntervalMs: iki,
+            keyLabel: tapInfo.keyLabel,
             tapLocalX: tapInfo.tapLocalX,
             tapLocalY: tapInfo.tapLocalY,
-            tapNormX: tapInfo.tapNormX,
-            tapNormY: tapInfo.tapNormY,
-            keyLabel: tapInfo.keyLabel,
-            keyScreenX: tapInfo.keyScreenX,
-            keyScreenY: tapInfo.keyScreenY,
             keyWidth: tapInfo.keyWidth,
-            keyHeight: tapInfo.keyHeight
+            keyHeight: tapInfo.keyHeight,
+            keyRow: Self.keyRow(for: tapInfo.keyLabel),
+            keyCol: Self.keyCol(for: tapInfo.keyLabel),
+            expectedChar: expectedChar,
+            actualChar: actualChar,
+            correctedChar: correctedChar,
+            isCorrect: isCorrect,
+            previousKeyLabel: prevKeyLabel,
+            textBefore: textBefore,
+            textAfter: textAfter,
+            interKeyIntervalMs: iki
         )
+    }
+
+    // MARK: - Key Row / Col Lookup
+
+    private static func keyRow(for label: String) -> String {
+        let top = Set(["q","w","e","r","t","y","u","i","o","p",
+                       "1","2","3","4","5","6","7","8","9","0"])
+        let mid = Set(["a","s","d","f","g","h","j","k","l",
+                       "-","/",":",";","(",")","$","&","@","\""])
+        let bot = Set(["z","x","c","v","b","n","m",
+                       "delete",".",",","?","!","'"])
+        if top.contains(label) { return "top" }
+        if mid.contains(label) { return "middle" }
+        if bot.contains(label) { return "bottom" }
+        return "space"   // space, return, and unknown special keys
+    }
+
+    private static func keyCol(for label: String) -> Int? {
+        let rows: [[String]] = [
+            ["q","w","e","r","t","y","u","i","o","p"],
+            ["a","s","d","f","g","h","j","k","l"],
+            ["z","x","c","v","b","n","m"],
+            ["1","2","3","4","5","6","7","8","9","0"],
+            ["-","/",":",";","(",")","$","&","@","\""],
+            [".",",","?","!","'"]
+        ]
+        for row in rows {
+            if let idx = row.firstIndex(of: label) { return idx }
+        }
+        return nil
     }
 
     // MARK: - Trial Submission
@@ -416,6 +440,7 @@ final class SessionManager {
         liveWPM = 0.0
         trialStartTime = nil
         lastEventTimestamp = nil
+        lastKeyLabel = ""
     }
 
     // MARK: - Formatted time

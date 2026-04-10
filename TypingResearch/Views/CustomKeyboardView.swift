@@ -234,7 +234,6 @@ private struct KeyCap: View {
     let overlayMode: Bool
     let onTap: (String, TapInfo) -> Void
 
-    @State private var keyGlobalFrame: CGRect = .zero
     @State private var isPressed: Bool = false
 
     private let haptic = UIImpactFeedbackGenerator(style: .light)
@@ -286,14 +285,6 @@ private struct KeyCap: View {
                     radius: 0, x: 0, y: 1)
     }
 
-    private var frameTracker: some View {
-        GeometryReader { geo in
-            Color.clear.onAppear {
-                keyGlobalFrame = geo.frame(in: .global)
-            }
-        }
-    }
-
     private var keyGesture: some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .local)
             .onChanged { _ in
@@ -303,13 +294,11 @@ private struct KeyCap: View {
                 isPressed = false
                 guard !action.isEmpty else { return }
                 let info = TapInfo(
-                    keyLabel: action,
+                    keyLabel:  action,
                     tapLocalX: Double(value.location.x),
                     tapLocalY: Double(value.location.y),
-                    keyScreenX: Double(keyGlobalFrame.minX),
-                    keyScreenY: Double(keyGlobalFrame.minY),
-                    keyWidth:   Double(keyGlobalFrame.width),
-                    keyHeight:  Double(keyGlobalFrame.height)
+                    keyWidth:  Double(width),
+                    keyHeight: Double(height)
                 )
                 onTap(action, info)
             }
@@ -329,7 +318,6 @@ private struct KeyCap: View {
         }
         .frame(width: width, height: height)
             .background(keyShape)
-            .background(frameTracker)
             .contentShape(Rectangle())
             .overlay(alignment: .top) {
                 if isPressed && label.count == 1 && !isSpecial {

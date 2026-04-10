@@ -35,7 +35,8 @@ struct TapDotPlotView: View {
     var transparent: Bool         = false
 
     enum DotColorMode: String, CaseIterable, Identifiable {
-        case byKey = "By Key"
+        case byAccuracy = "Correct / Incorrect"
+        case byKey      = "By Key"
         var id: String { rawValue }
     }
 
@@ -104,6 +105,7 @@ struct TapDotPlotView: View {
             let dots   = validDots
 
             Canvas { ctx, _ in
+                // ── 1. Key backgrounds ────────────────────────────────────────
                 if !transparent {
                     for (_, rect) in frames {
                         ctx.fill(
@@ -113,46 +115,63 @@ struct TapDotPlotView: View {
                     }
                 }
 
-                for event in dots {
-                    guard let frame = frames[event.keyLabel] else { continue }
-                    let normX = event.keyWidth > 0 ? event.tapLocalX / event.keyWidth : 0.5
-                    let normY = event.keyHeight > 0 ? event.tapLocalY / event.keyHeight : 0.5
-                    let x = frame.minX + CGFloat(normX) * frame.width
-                    let y = frame.minY + CGFloat(normY) * frame.height
-
-                    let colorKey = event.expectedChar.isEmpty ? event.keyLabel : event.expectedChar
-                    let r = dotRadius
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r*2, height: r*2)),
-                        with: .color(Color.dotColor(forKey: colorKey).opacity(0.85))
-                    )
-                    let label = colorKey == "space" ? "\u{00B7}" : colorKey == "delete" ? "\u{232B}" : colorKey
-                    if label.count <= 1 {
-                        ctx.draw(
-                            Text(label)
-                                .font(.system(size: 6, weight: .bold, design: .monospaced))
-                                .foregroundColor(Color.dotColor(forKey: colorKey)),
-                            at: CGPoint(x: x + r + 5, y: y)
-                        )
-                    }
-                }
-
-                for (_, rect) in frames {
+                // ── 2. Key outlines + labels (bottom-left corner, drawn BEFORE
+                //       dots so dots always appear on top and labels stay visible)
+                for (label, rect) in frames {
                     ctx.stroke(
                         Path(roundedRect: rect, cornerRadius: 5),
                         with: .color(Color(.separator).opacity(transparent ? 0.0 : 0.4)),
                         lineWidth: 0.5
                     )
-                }
-
-                if !transparent {
-                    for (label, rect) in frames {
+                    if !transparent {
                         ctx.draw(
                             Text(keyDisplay(label))
-                                .font(.system(size: label.count > 1 ? 7.5 : 9,
-                                              weight: .regular, design: .monospaced))
-                                .foregroundColor(Color(.tertiaryLabel)),
-                            at: CGPoint(x: rect.midX, y: rect.midY)
+                                .font(.system(size: label.count > 1 ? 7 : 9,
+                                              weight: .medium, design: .monospaced))
+                                .foregroundColor(Color(.secondaryLabel)),
+                            at: CGPoint(x: rect.minX + 6, y: rect.maxY - 8)
+                        )
+                    }
+                }
+
+                // ── 3. Dots (drawn on top of keys) ───────────────────────────
+                for event in dots {
+                    guard let frame = frames[event.keyLabel] else { continue }
+                    let normX = event.keyWidth  > 0 ? event.tapLocalX / event.keyWidth  : 0.5
+                    let normY = event.keyHeight > 0 ? event.tapLocalY / event.keyHeight : 0.5
+                    let x = frame.minX + CGFloat(normX) * frame.width
+                    let y = frame.minY + CGFloat(normY) * frame.height
+                    let r = dotRadius
+
+                    let colorKey = event.expectedChar.isEmpty ? event.keyLabel : event.expectedChar
+                    let fill: Color
+                    switch colorMode {
+                    case .byAccuracy:
+                        fill = event.isCorrect ? Color(.systemGreen) : Color(.systemRed)
+                    case .byKey:
+                        fill = Color.dotColor(forKey: colorKey)
+                    }
+
+                    // White halo for contrast against any background
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: x - r - 1, y: y - r - 1,
+                                               width: (r+1)*2, height: (r+1)*2)),
+                        with: .color(Color.white.opacity(0.75))
+                    )
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r*2, height: r*2)),
+                        with: .color(fill.opacity(0.90))
+                    )
+                    // Expected char written inside dot in white
+                    let dotLabel = colorKey == "space" ? "\u{00B7}"
+                                 : colorKey == "delete" ? "\u{232B}" : colorKey
+                    if dotLabel.count == 1 {
+                        ctx.draw(
+                            Text(dotLabel)
+                                .font(.system(size: max(5, r * 1.1), weight: .bold,
+                                              design: .monospaced))
+                                .foregroundColor(.white),
+                            at: CGPoint(x: x, y: y)
                         )
                     }
                 }
@@ -190,22 +209,8 @@ struct TapDotPlotView: View {
         return events.filter {
             !$0.keyLabel.isEmpty &&
             allowedKeys.contains($0.keyLabel) &&
-            !($0.tapNormX == 0 && $0.tapNormY == 0 &&
-              $0.tapLocalX == 0 && $0.tapLocalY == 0)
+            $0.keyWidth > 0
         }
-    }
-
-    private func clamp(_ v: Double) -> CGFloat {
-        CGFloat(max(0.01, min(0.99, v.isNaN ? 0.5 : v)))
-    }
-
-    private func keyboardScreenBounds(from events: [InputEventData]) -> CGRect {
-        guard !events.isEmpty else { return .zero }
-        let minX = events.map { $0.keyScreenX }.min() ?? 0
-        let minY = events.map { $0.keyScreenY }.min() ?? 0
-        let maxX = events.map { $0.keyScreenX + $0.keyWidth }.max() ?? 1
-        let maxY = events.map { $0.keyScreenY + $0.keyHeight }.max() ?? 1
-        return CGRect(x: minX, y: minY, width: maxX - minX, height: maxY - minY)
     }
 
     private func keyDisplay(_ label: String) -> String {

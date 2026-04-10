@@ -130,13 +130,11 @@ struct TrialView: View {
                         let idx    = max(0, min(Int(x / step), row.count - 1))
                         let localX = min(max(x - CGFloat(idx) * step, 0), kw)
                         let tapInfo = TapInfo(
-                            keyLabel:   row[idx],
-                            tapLocalX:  Double(localX),
-                            tapLocalY:  Double(value.location.y),
-                            keyScreenX: Double(globalFrame.minX + kbSidePad + CGFloat(idx) * step),
-                            keyScreenY: Double(globalFrame.maxY),   // top of first keyboard row
-                            keyWidth:   Double(kw),
-                            keyHeight:  Double(keyH)
+                            keyLabel:  row[idx],
+                            tapLocalX: Double(localX),
+                            tapLocalY: Double(value.location.y),
+                            keyWidth:  Double(kw),
+                            keyHeight: Double(keyH)
                         )
                         handleKeyTap(key: row[idx], tapInfo: tapInfo)
                     }
@@ -256,8 +254,6 @@ struct TrialView: View {
             Spacer()
             coordCell(label: "local x", value: lastTapInfo.tapLocalX)
             coordCell(label: "local y", value: lastTapInfo.tapLocalY)
-            coordCell(label: "norm x",  value: lastTapInfo.tapNormX, decimals: 3)
-            coordCell(label: "norm y",  value: lastTapInfo.tapNormY, decimals: 3)
         }
         .font(.system(size: 11, design: .monospaced))
         .foregroundColor(.secondary)
