@@ -218,7 +218,7 @@ struct TrialView: View {
                             ForEach(Array(targetChars.enumerated()), id: \.offset) { index, char in
                                 Text(String(char))
                                     .font(.system(size: 22, weight: .medium, design: .monospaced))
-                                    .foregroundColor(charColor(index: index, typedCount: cursorIndex))
+                                    .foregroundColor(charColor(index: index, typedCount: cursorIndex, targetChar: char, typedChars: typedChars))
                                     .underline(index == cursorIndex)
                                     .background(index == cursorIndex ? Color.orange.opacity(0.25) : Color.clear)
                                     .id(index)
@@ -239,8 +239,10 @@ struct TrialView: View {
         }
     }
 
-    private func charColor(index: Int, typedCount: Int) -> Color {
-        if index < typedCount  { return .secondary }
+    private func charColor(index: Int, typedCount: Int, targetChar: Character, typedChars: [Character]) -> Color {
+        if index < typedCount {
+            return typedChars[index] == targetChar ? .green : .red
+        }
         if index == typedCount { return .primary }
         return .primary.opacity(0.35)
     }
