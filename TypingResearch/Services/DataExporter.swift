@@ -2,16 +2,47 @@ import Foundation
 
 final class DataExporter {
 
-    // MARK: - Keystroke CSV Export
+    // MARK: - Raw Keystroke CSV
 
     func exportKeystrokesCSV(
         session: Session,
         events: [InputEventData],
         participant: Participant?
     ) -> URL? {
-        var rows: [String] = []
+        let csv = makeCSV(events: events, session: session,
+                          participant: participant, cleaned: false)
+        let name = filename(participant: participant, suffix: "keystrokes", ext: "csv")
+        return writeToTempFile(content: csv, filename: name)
+    }
 
-        rows.append([
+    // MARK: - Cleaned Keystroke CSV
+    //
+    // Mirrors scripts/clean_keystrokes.py: appends dist_from_target_kw,
+    // is_outlier, and outlier_flags to the raw row schema. (tap_norm_x and
+    // tap_norm_y already exist in the raw schema and carry the same values
+    // the cleaner would compute, so they are not duplicated.)
+
+    func exportCleanedKeystrokesCSV(
+        session: Session,
+        events: [InputEventData],
+        participant: Participant?
+    ) -> URL? {
+        let csv = makeCSV(events: events, session: session,
+                          participant: participant, cleaned: true)
+        let name = filename(participant: participant,
+                            suffix: "keystrokes_cleaned", ext: "csv")
+        return writeToTempFile(content: csv, filename: name)
+    }
+
+    // MARK: - CSV Construction
+
+    private func makeCSV(
+        events: [InputEventData],
+        session: Session,
+        participant: Participant?,
+        cleaned: Bool
+    ) -> String {
+        var header: [String] = [
             "participant_first", "participant_last", "session_id",
             "event_type", "key_label",
             "tap_local_x", "tap_local_y",
@@ -22,14 +53,18 @@ final class DataExporter {
             "previous_key_label",
             "text_before",
             "timestamp_ms", "inter_key_interval_ms"
-        ].joined(separator: ","))
+        ]
+        if cleaned {
+            header += ["dist_from_target_kw", "is_outlier", "outlier_flags"]
+        }
 
+        var rows: [String] = [header.joined(separator: ",")]
         let sessionStart = session.startedAt
 
         for event in events {
             let keyColStr   = event.keyCol.map { "\($0)" } ?? ""
             let isCorrectStr = event.eventType == .delete ? "" : (event.isCorrect ? "1" : "0")
-            let row: [String] = [
+            var row: [String] = [
                 csvEscape(participant?.firstName ?? ""),
                 csvEscape(participant?.lastName  ?? ""),
                 csvEscape(event.sessionId.uuidString),
@@ -52,18 +87,31 @@ final class DataExporter {
                 String(format: "%.3f", event.timestamp.timeIntervalSince(sessionStart) * 1000),
                 String(format: "%.3f", event.interKeyIntervalMs)
             ]
+
+            if cleaned {
+                let flagged = KeystrokeCleaner.flag(event)
+                let distStr = flagged.distFromTargetKW
+                    .map { String(format: "%.3f", $0) } ?? ""
+                row += [
+                    distStr,
+                    flagged.isOutlier ? "1" : "0",
+                    csvEscape(flagged.flagsString)
+                ]
+            }
+
             rows.append(row.joined(separator: ","))
         }
 
-        let first = participant?.firstName ?? "unknown"
-        let last  = participant?.lastName  ?? "unknown"
-        return writeToTempFile(
-            content: rows.joined(separator: "\n"),
-            filename: "keystrokes_\(first)_\(last).csv"
-        )
+        return rows.joined(separator: "\n")
     }
 
     // MARK: - Helpers
+
+    private func filename(participant: Participant?, suffix: String, ext: String) -> String {
+        let first = participant?.firstName ?? "unknown"
+        let last  = participant?.lastName  ?? "unknown"
+        return "\(suffix)_\(first)_\(last).\(ext)"
+    }
 
     private func csvEscape(_ value: String) -> String {
         if value.contains(",") || value.contains("\"") || value.contains("\n") {

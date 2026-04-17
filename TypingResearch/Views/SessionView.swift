@@ -36,8 +36,10 @@ struct SummaryView: View {
     var sessionManager: SessionManager
     @State private var shareItem: ShareItem? = nil
     @State private var showResetConfirm: Bool = false
-    @State private var isGeneratingKeyboardView: Bool = false
+    @State private var generatingPDF: PDFKind? = nil
     @State private var plotLayout: TapDotPlotView.LayoutMode = .alpha
+
+    private enum PDFKind { case raw, cleaned }
 
     var body: some View {
         NavigationStack {
@@ -131,62 +133,107 @@ struct SummaryView: View {
     // MARK: - Export Buttons
 
     private var exportButtons: some View {
-        VStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 16) {
+            exportGroup(
+                title: "Raw data",
+                caption: "Every recorded keystroke.",
+                csvAction: { exportCSV(cleaned: false) },
+                csvLabel: "Raw Keystrokes CSV",
+                pdfAction: { exportPDF(.raw) },
+                pdfLabel: "Raw Keyboard View PDF",
+                pdfKind: .raw
+            )
 
-            Button(action: exportKeystrokes) {
-                Label("Export Keystrokes CSV", systemImage: "keyboard")
-                    .frame(maxWidth: .infinity).padding()
-                    .background(Color(.systemGray5))
-                    .foregroundColor(.primary).cornerRadius(10)
-            }
-
-            Button(action: exportKeyboardViewPDF) {
-                HStack {
-                    if isGeneratingKeyboardView {
-                        ProgressView().tint(.white).padding(.trailing, 4)
-                    } else {
-                        Image(systemName: "keyboard.badge.eye")
-                    }
-                    Text(isGeneratingKeyboardView ? "Generating\u{2026}" : "Export Keyboard View PDF")
-                }
-                .frame(maxWidth: .infinity).padding()
-                .background(Color.purple)
-                .foregroundColor(.white).cornerRadius(10)
-            }
-            .disabled(isGeneratingKeyboardView)
+            exportGroup(
+                title: "Cleaned data",
+                caption: "Outliers flagged; spatial + far-from-target taps dropped from the PDF.",
+                csvAction: { exportCSV(cleaned: true) },
+                csvLabel: "Cleaned Keystrokes CSV",
+                pdfAction: { exportPDF(.cleaned) },
+                pdfLabel: "Cleaned Keyboard View PDF",
+                pdfKind: .cleaned
+            )
         }
         .sheet(item: $shareItem) { item in
             ShareSheet(activityItems: [item.url])
         }
     }
 
+    @ViewBuilder
+    private func exportGroup(
+        title: String,
+        caption: String,
+        csvAction: @escaping () -> Void,
+        csvLabel: String,
+        pdfAction: @escaping () -> Void,
+        pdfLabel: String,
+        pdfKind: PDFKind
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            Text(caption)
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Button(action: csvAction) {
+                Label(csvLabel, systemImage: "keyboard")
+                    .frame(maxWidth: .infinity).padding()
+                    .background(Color(.systemGray5))
+                    .foregroundColor(.primary).cornerRadius(10)
+            }
+
+            Button(action: pdfAction) {
+                HStack {
+                    if generatingPDF == pdfKind {
+                        ProgressView().tint(.white).padding(.trailing, 4)
+                    } else {
+                        Image(systemName: "keyboard.badge.eye")
+                    }
+                    Text(generatingPDF == pdfKind ? "Generating\u{2026}" : pdfLabel)
+                }
+                .frame(maxWidth: .infinity).padding()
+                .background(Color.purple)
+                .foregroundColor(.white).cornerRadius(10)
+            }
+            .disabled(generatingPDF != nil)
+        }
+    }
+
     // MARK: - Export Actions
 
-    private func exportKeyboardViewPDF() {
+    private func exportPDF(_ kind: PDFKind) {
         guard let session = sessionManager.currentSession else { return }
-        isGeneratingKeyboardView = true
+        generatingPDF = kind
+        let mode: KeyboardViewPDFExporter.Mode = kind == .cleaned ? .cleaned : .raw
         Task.detached(priority: .userInitiated) {
             let exporter = KeyboardViewPDFExporter()
             let url = await exporter.exportPDF(
                 events: sessionManager.allEvents,
                 session: session,
-                participant: sessionManager.participant
+                participant: sessionManager.participant,
+                mode: mode
             )
             await MainActor.run {
-                isGeneratingKeyboardView = false
+                generatingPDF = nil
                 if let url { shareItem = ShareItem(url: url) }
             }
         }
     }
 
-    private func exportKeystrokes() {
+    private func exportCSV(cleaned: Bool) {
         guard let session = sessionManager.currentSession else { return }
-        if let url = DataExporter().exportKeystrokesCSV(
-            session: session,
-            events: sessionManager.allEvents,
-            participant: sessionManager.participant) {
-            shareItem = ShareItem(url: url)
-        }
+        let exporter = DataExporter()
+        let url = cleaned
+            ? exporter.exportCleanedKeystrokesCSV(
+                session: session,
+                events: sessionManager.allEvents,
+                participant: sessionManager.participant)
+            : exporter.exportKeystrokesCSV(
+                session: session,
+                events: sessionManager.allEvents,
+                participant: sessionManager.participant)
+        if let url { shareItem = ShareItem(url: url) }
     }
 }
 
@@ -216,6 +263,11 @@ struct ShareSheet: UIViewControllerRepresentable {
 
 final class KeyboardViewPDFExporter {
 
+    enum Mode {
+        case raw       // include all taps
+        case cleaned   // drop taps flagged as spatial or far_from_target
+    }
+
     private let pageW:  CGFloat = 612
     private let pageH:  CGFloat = 792
     private let margin: CGFloat = 36
@@ -237,21 +289,28 @@ final class KeyboardViewPDFExporter {
     func exportPDF(
         events: [InputEventData],
         session: Session,
-        participant: Participant?
+        participant: Participant?,
+        mode: Mode = .raw
     ) async -> URL? {
 
-        let validEvents = events.filter {
-            !$0.keyLabel.isEmpty &&
-            Set(row0 + row1 + row2 + ["space", "delete"]).contains($0.keyLabel) &&
-            $0.keyWidth > 0
+        let validKeys = Set(row0 + row1 + row2 + ["space", "delete"])
+        let validEvents = events.filter { e in
+            guard !e.keyLabel.isEmpty,
+                  validKeys.contains(e.keyLabel),
+                  e.keyWidth > 0
+            else { return false }
+            guard mode == .cleaned else { return true }
+            let flags = KeystrokeCleaner.flag(e).flags
+            return !flags.contains(.spatial) && !flags.contains(.farFromTarget)
         }
         guard !validEvents.isEmpty else { return nil }
 
         let first = participant?.firstName ?? "unknown"
         let last  = participant?.lastName  ?? "unknown"
+        let suffix = mode == .cleaned ? "_cleaned" : ""
         let url = FileManager.default
             .temporaryDirectory
-            .appendingPathComponent("keyboard_view_\(first)_\(last).pdf")
+            .appendingPathComponent("keyboard_view\(suffix)_\(first)_\(last).pdf")
 
         let renderer = UIGraphicsPDFRenderer(
             bounds: CGRect(x: 0, y: 0, width: pageW, height: pageH)
@@ -260,7 +319,8 @@ final class KeyboardViewPDFExporter {
         let data = renderer.pdfData { ctx in
             ctx.beginPage()
             let headerBottom = drawHeader(ctx: ctx, session: session,
-                                          participant: participant, tapCount: validEvents.count)
+                                          participant: participant,
+                                          tapCount: validEvents.count, mode: mode)
             let cgCtx = ctx.cgContext
 
             // Canvas area
@@ -412,12 +472,16 @@ final class KeyboardViewPDFExporter {
 
     @discardableResult
     private func drawHeader(ctx: UIGraphicsPDFRendererContext, session: Session,
-                            participant: Participant?, tapCount: Int) -> CGFloat {
+                            participant: Participant?, tapCount: Int,
+                            mode: Mode) -> CGFloat {
         let cgCtx = ctx.cgContext
         cgCtx.setFillColor(UIColor.systemPurple.withAlphaComponent(0.85).cgColor)
         cgCtx.fill(CGRect(x: 0, y: 0, width: pageW, height: 40))
 
-        drawText("Tap Distribution \u{2014} Keyboard View",
+        let title = mode == .cleaned
+            ? "Tap Distribution \u{2014} Keyboard View (Cleaned)"
+            : "Tap Distribution \u{2014} Keyboard View"
+        drawText(title,
                  at: CGPoint(x: margin, y: 10),
                  font: .systemFont(ofSize: 14, weight: .bold), color: .white)
         drawText("\(tapCount) taps",

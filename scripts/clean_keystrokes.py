@@ -4,30 +4,29 @@ clean_keystrokes.py
 -------------------
 Flags outliers in raw keystroke CSVs exported from the TypingResearch iOS app.
 
-Does NOT delete rows — adds four columns so downstream analyses can filter
-with different thresholds without re-running the pipeline:
+Does NOT delete rows — adds columns so downstream analyses can filter with
+different thresholds without re-running the pipeline:
 
-    tap_norm_x      float   tapLocalX / keyWidth  (0 = left edge, 1 = right edge)
-    tap_norm_y      float   tapLocalY / keyHeight  (0 = top edge, 1 = bottom edge)
-    is_outlier      int     1 if any flag fired, else 0
-    outlier_flags   str     pipe-separated reasons (empty string = clean)
+    tap_norm_x           float  tapLocalX / keyWidth  (0 = left, 1 = right)
+    tap_norm_y           float  tapLocalY / keyHeight (0 = top,  1 = bottom)
+    dist_from_target_kw  float  distance from tap to expected key rect,
+                                  measured in key-widths (0 if tap is inside
+                                  the expected key's rectangle)
+    is_outlier           int    1 if any flag fired, else 0
+    outlier_flags        str    pipe-separated reasons (empty = clean)
 
-Outlier criteria (literature-grounded):
-    spatial     tap_norm_x or tap_norm_y outside [-0.5, 1.5]
-                  → tap is >½ key-width outside the key boundary.
-                  Threshold from Azenkot & Zhai (2012): exclude taps further
-                  from key center than the width of an adjacent key.
-    iki_low     inter_key_interval_ms < 50
-                  → physiologically impossible; double-registration or jitter.
-    iki_high    inter_key_interval_ms > 3000
-                  → pause/distraction, not typing rhythm.
-    trial_start text_before == ""
-                  → first keystroke of a trial; its IKI is stimulus reaction
-                  time, not a between-key interval.  Always exclude from IKI
-                  distributions; optionally exclude from tap distributions.
-    delete_event event_type == "delete"
-                  → user aimed at backspace intentionally; exclude from
-                  tap-distribution / boundary-reconstruction analyses.
+Outlier criteria:
+    spatial          tap_norm_x / tap_norm_y outside [-0.5, 1.5]
+                       → tap is >½ key-width outside the HIT key's boundary.
+                       Threshold from Azenkot & Zhai (2012).
+    far_from_target  dist_from_target_kw > 1.25
+                       → tap landed more than 1.25 key-widths from the
+                       EXPECTED key — too far to count as a legitimate
+                       neighbor mistap.
+    iki_low          inter_key_interval_ms < 50  → double-registration
+    iki_high         inter_key_interval_ms > 3000 → pause / distraction
+    trial_start      text_before == ""  → first keystroke of a trial
+    delete_event     event_type == "delete"  → intentional backspace
 
 Usage:
     python clean_keystrokes.py <input.csv> [output.csv]
@@ -42,12 +41,31 @@ import csv
 import os
 from pathlib import Path
 
-# ── Configurable thresholds ────────────────────────────────────────────────
-SPATIAL_MIN = -0.5   # norm_x / norm_y lower bound (inclusive)
-SPATIAL_MAX =  1.5   # norm_x / norm_y upper bound (inclusive)
-IKI_MIN_MS  =  50.0  # IKI below this → iki_low
-IKI_MAX_MS  = 3000.0 # IKI above this → iki_high
+# ── Configurable thresholds ──────────────────────────────────────────────
+SPATIAL_MIN  = -0.5   # norm_x / norm_y lower bound (inclusive)
+SPATIAL_MAX  =  1.5   # norm_x / norm_y upper bound (inclusive)
+IKI_MIN_MS   =  50.0  # IKI below this → iki_low
+IKI_MAX_MS   = 3000.0 # IKI above this → iki_high
+DIST_MAX_KW  =  1.25  # far_from_target: max distance from expected key, in key-widths
 # ──────────────────────────────────────────────────────────────────────────
+
+# ── Keyboard layout (key-width units; row height = 1.35 key-widths) ──────
+ROW_H = 1.35
+
+def _make_rects():
+    rects = {}
+    def row(keys, x_start, r):
+        for i, k in enumerate(keys):
+            x = x_start + i
+            rects[k] = (x, r * ROW_H, x + 1.0, (r + 1) * ROW_H)
+    row(list("qwertyuiop"), 0.0, 0)
+    row(list("asdfghjkl"),  0.5, 1)
+    row(list("zxcvbnm"),    1.5, 2)
+    rects["delete"] = (8.5, 2 * ROW_H, 10.0, 3 * ROW_H)
+    rects["space"]  = (1.5, 3 * ROW_H,  8.5, 4 * ROW_H)
+    return rects
+
+KEY_RECTS = _make_rects()
 
 
 def safe_float(val, default=0.0):
@@ -55,6 +73,36 @@ def safe_float(val, default=0.0):
         return float(val)
     except (ValueError, TypeError):
         return default
+
+
+def expected_to_key(expected_raw: str) -> str | None:
+    if expected_raw == " ":
+        return "space"
+    k = expected_raw.lower()
+    return k if k in KEY_RECTS else None
+
+
+def tap_absolute_position(row: dict) -> tuple[float, float] | None:
+    key = row.get("key_label", "").strip().lower()
+    rect = KEY_RECTS.get(key)
+    if rect is None:
+        return None
+    kw_v = safe_float(row.get("key_width"))
+    kh_v = safe_float(row.get("key_height"))
+    if kw_v <= 0 or kh_v <= 0:
+        return None
+    nx = safe_float(row.get("tap_local_x")) / kw_v
+    ny = safe_float(row.get("tap_local_y")) / kh_v
+    x = rect[0] + nx * (rect[2] - rect[0])
+    y = rect[1] + ny * (rect[3] - rect[1])
+    return x, y
+
+
+def distance_to_rect(x: float, y: float, rect: tuple) -> float:
+    xmin, ymin, xmax, ymax = rect
+    dx = max(xmin - x, 0.0, x - xmax)
+    dy = max(ymin - y, 0.0, y - ymax)
+    return (dx * dx + dy * dy) ** 0.5
 
 
 def compute_flags(row: dict) -> list[str]:
@@ -91,6 +139,18 @@ def compute_flags(row: dict) -> list[str]:
     if row.get("event_type", "").strip().lower() == "delete":
         flags.append("delete_event")
 
+    # ── Distance from expected key (key-width units) ─────────────────────
+    expected_key = expected_to_key(row.get("expected_char", ""))
+    exp_rect = KEY_RECTS.get(expected_key) if expected_key else None
+    pos = tap_absolute_position(row) if exp_rect else None
+    if exp_rect and pos:
+        d = distance_to_rect(pos[0], pos[1], exp_rect)
+        row["dist_from_target_kw"] = f"{d:.3f}"
+        if d > DIST_MAX_KW:
+            flags.append("far_from_target")
+    else:
+        row["dist_from_target_kw"] = ""
+
     return flags
 
 
@@ -105,6 +165,7 @@ def clean_file(input_path: str, output_path: str | None = None) -> str:
         rows     = list(reader)
 
     new_fields = list(orig_fields) + ["tap_norm_x", "tap_norm_y",
+                                       "dist_from_target_kw",
                                        "is_outlier", "outlier_flags"]
 
     total    = len(rows)

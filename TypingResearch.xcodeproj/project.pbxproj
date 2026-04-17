@@ -19,6 +19,7 @@
 		AA000000000000000000007 /* LoggingTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000007 /* LoggingTextField.swift */; };
 		AA000000000000000000008 /* DataExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000008 /* DataExporter.swift */; };
 		AA000000000000000000009 /* Utilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000009 /* Utilities.swift */; };
+		AA000000000000000000012 /* KeystrokeCleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000012 /* KeystrokeCleaner.swift */; };
 		JJ000000000000000000010 /* CustomKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = JJ000000000000000000011 /* CustomKeyboardView.swift */; };
 /* End PBXBuildFile section */
 
@@ -36,6 +37,7 @@
 		BB000000000000000000007 /* LoggingTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoggingTextField.swift; sourceTree = "<group>"; };
 		BB000000000000000000008 /* DataExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExporter.swift; sourceTree = "<group>"; };
 		BB000000000000000000009 /* Utilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Utilities.swift; sourceTree = "<group>"; };
+		BB000000000000000000012 /* KeystrokeCleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeystrokeCleaner.swift; sourceTree = "<group>"; };
 		BB000000000000000000099 /* TypingResearch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TypingResearch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		JJ000000000000000000011 /* CustomKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomKeyboardView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -114,6 +116,7 @@
 			isa = PBXGroup;
 			children = (
 				BB000000000000000000008 /* DataExporter.swift */,
+				BB000000000000000000012 /* KeystrokeCleaner.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -207,6 +210,7 @@
 				AA000000000000000000006 /* TrialView.swift in Sources */,
 				AA000000000000000000007 /* LoggingTextField.swift in Sources */,
 				AA000000000000000000008 /* DataExporter.swift in Sources */,
+				AA000000000000000000012 /* KeystrokeCleaner.swift in Sources */,
 				AA000000000000000000009 /* Utilities.swift in Sources */,
 				JJ000000000000000000010 /* CustomKeyboardView.swift in Sources */,
 			);
