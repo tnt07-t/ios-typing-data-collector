@@ -351,6 +351,28 @@ def test_each_session_gets_its_own_summary_file(tmp_path):
     assert "## calibration" in text
 
 
+def test_summary_definitions_live_in_one_glossary_block(tmp_path):
+    # A definition printed inline next to a count reads as observed data (the
+    # hardcoded "coler -> cooler" illustration was taken for a session finding
+    # in review). Data lines carry counts only; all definitions live in one
+    # <details> glossary at the end.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (920, "insert", "", " ", 3, 0, 4, 20, 0, 0),
+    ])
+    out_dir = tmp_path / "out"
+    sm.main([str(session), "--out-dir", str(out_dir)])
+    text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
+    assert text.count("<details><summary>label definitions</summary>") == 1
+    body = text.split("<details>")[0]
+    assert " — *" not in body            # no definition on any data line
+    assert "coler" not in body           # the illustration that caused the bug
+    glossary = text.split("<details>")[1]
+    for definition in list(sm.SOURCE_DEFS) + list(sm.EFFECT_DEFS) + list(sm.OUTCOME_DEFS):
+        assert definition in glossary
+
+
 def test_session_dir_accepted_as_well_as_file(tmp_path):
     session = write_keystrokes_csv(tmp_path, [
         (0, "insert", "", "a", 0, 0, 1, 0, 0, 0),

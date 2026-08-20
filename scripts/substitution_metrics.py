@@ -609,7 +609,9 @@ SOURCE_HEADINGS = {
     "unknown": "unknown",
 }
 
-# One-line definitions printed next to each summary label.
+# One-line definitions, rendered as a glossary block at the end of the summary.
+# Never printed on a data line: an illustration like "coler -> cooler" next to a
+# count reads as observed data (it was taken for exactly that in review).
 SOURCE_DEFS = {
     "autocorrect": "iOS changed the word itself when a space/delimiter was typed",
     "suggestion bar taps": "user tapped a word in the bar above the keyboard",
@@ -661,26 +663,22 @@ def write_summary_md(summary, rows, calibration, path):
     lines.append("## substitutions by mechanism")
     for source, heading in SOURCE_HEADINGS.items():
         group = [row for row in subs if row["substitution_source"] == source]
-        lines.append(f"- {heading}: {len(group)} — *{SOURCE_DEFS[heading]}*")
+        lines.append(f"- {heading}: {len(group)}")
         if not group:
             continue
-        for axis, label, defs in (
-            ("substitution_effect", "", EFFECT_DEFS),
-            ("substitution_outcome", "outcome: ", OUTCOME_DEFS),
+        for axis, label in (
+            ("substitution_effect", ""),
+            ("substitution_outcome", "outcome: "),
         ):
             counts = {}
             for row in group:
                 value = row[axis] or "(not resolved)"
                 counts[value] = counts.get(value, 0) + 1
             for value in sorted(counts, key=lambda v: (-counts[v], v)):
-                definition = defs.get(value, "")
-                suffix = f" — *{definition}*" if definition else ""
-                lines.append(f"  - {label}{value}: {counts[value]}{suffix}")
+                lines.append(f"  - {label}{value}: {counts[value]}")
         grey = sum(1 for row in group if row["substitution_source_confidence"] == "grey_zone")
         if grey:
-            lines.append(
-                f"  - grey-zone rows: {grey} — *timing ambiguous, review before trusting*"
-            )
+            lines.append(f"  - grey-zone rows: {grey}")
     lines.append("")
     lines.append("## calibration")
     lines.append(
@@ -688,6 +686,20 @@ def write_summary_md(summary, rows, calibration, path):
         f"({calibration['mode']}; anchors {calibration['low_anchors']} low / "
         f"{calibration['high_anchors']} high)"
     )
+    lines.append("")
+    lines.append("<details><summary>label definitions</summary>")
+    lines.append("")
+    for title, defs in (
+        ("mechanism", SOURCE_DEFS),
+        ("effect", EFFECT_DEFS),
+        ("outcome", OUTCOME_DEFS),
+    ):
+        lines.append(f"- {title}:")
+        for label, definition in defs.items():
+            lines.append(f"  - {label}: *{definition}*")
+    lines.append("- grey-zone rows: *timing ambiguous, review before trusting*")
+    lines.append("")
+    lines.append("</details>")
     lines.append("")
 
     parent = os.path.dirname(os.path.abspath(path))
