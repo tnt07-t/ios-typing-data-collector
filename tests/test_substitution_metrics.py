@@ -475,6 +475,34 @@ def test_each_session_gets_its_own_summary_file(tmp_path):
     assert "## calibration" in text
 
 
+def test_episode_section_pairs_the_three_axes(tmp_path):
+    # Per-axis tallies cannot be re-paired: 2 effects + 2 outcomes alone
+    # cannot say which effect was reverted. The episodes section can.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "i", 0, 0, 1, 0, 0, 0),
+        (500, "replace", "i", "I", 0, 1, 1, 500, 0, 0),        # caps, kept
+        (600, "insert", "", " teh", 1, 0, 5, 100, 0, 0),
+        (1500, "replace", "teh", "the", 2, 3, 5, 900, 0, 0),   # spelling, reverted
+        (2100, "delete", "e", "", 4, 1, 4, 600, 0, 0),
+        (2200, "delete", "h", "", 3, 1, 3, 100, 0, 0),
+        (2300, "delete", "t", "", 2, 1, 2, 100, 0, 0),
+    ])
+    out_dir = tmp_path / "out"
+    joint = tmp_path / "joint.csv"
+    sm.main([str(session), "--out-dir", str(out_dir), "--joint-out", str(joint)])
+    text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
+    assert "## episodes" in text
+    assert "- autocorrect · capitalization · kept: 1" in text
+    assert "- autocorrect · spelling · reverted_other: 1" in text
+    with joint.open(newline="", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
+    assert {
+        "session_dir": "Alex,1,left,ac_on", "source": "autocorrect_engine",
+        "effect": "spelling", "outcome": "reverted_other", "count": "1",
+    } in rows
+    assert len(rows) == 2
+
+
 def test_summary_definitions_live_in_one_glossary_block(tmp_path):
     # A definition printed inline next to a count reads as observed data (the
     # hardcoded "coler -> cooler" illustration was taken for a session finding

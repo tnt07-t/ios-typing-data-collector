@@ -680,6 +680,32 @@ OUTCOME_DEFS = {
 }
 
 
+def joint_counts(rows):
+    """(source, effect, outcome) episode counts, in taxonomy order.
+
+    The three per-axis tallies cannot be re-paired after the fact - a session
+    with 4 capitalizations, 1 contraction, 4 kept and 1 edited_after cannot
+    say which one was edited. Deliberately not part of SUMMARY_FIELDS: the
+    combined CSV is fixed-width, and enumerating the cross product would mean
+    ~210 columns (see the plan's rejected list). Long format or markdown only.
+    """
+    counts = {}
+    for row in rows:
+        if not row["substitution_source"]:
+            continue
+        key = (
+            row["substitution_source"],
+            row["substitution_effect"],
+            row["substitution_outcome"] or "(not resolved)",
+        )
+        counts[key] = counts.get(key, 0) + 1
+    sources = list(SOURCE_HEADINGS)
+    outcomes = OUTCOMES + ["(not resolved)"]
+    def rank(key):
+        return (sources.index(key[0]), EFFECTS.index(key[1]), outcomes.index(key[2]))
+    return {key: counts[key] for key in sorted(counts, key=rank)}
+
+
 def write_summary_md(summary, rows, calibration, path):
     """Per-session summary as vertical markdown: one block per mechanism,
     its purposes (effects) and fates (outcomes) as indented lines, then the
@@ -721,6 +747,11 @@ def write_summary_md(summary, rows, calibration, path):
         grey = sum(1 for row in group if row["substitution_source_confidence"] == "grey_zone")
         if grey:
             lines.append(f"  - grey-zone rows: {grey}")
+    lines.append("")
+    lines.append("## episodes")
+    for (source, effect, outcome), count in joint_counts(subs).items():
+        heading = SOURCE_HEADINGS.get(source, source)
+        lines.append(f"- {heading} · {effect} · {outcome}: {count}")
     lines.append("")
     lines.append("## calibration")
     lines.append(
@@ -776,6 +807,11 @@ def main(argv=None):
         "--labeled-out",
         help="explicit processed CSV path, overriding --out-dir (one input only)",
     )
+    parser.add_argument(
+        "--joint-out",
+        help="write one combined long-format episode table for this run's "
+        "inputs: session_dir, source, effect, outcome, count",
+    )
     args = parser.parse_args(argv)
     if args.labeled_out and len(args.keystrokes_inputs) != 1:
         parser.error("--labeled-out requires exactly one keystrokes input")
@@ -786,9 +822,18 @@ def main(argv=None):
     summaries = []
     written = []
     summary_paths = []
+    joint_rows = []
     for keystrokes_input in args.keystrokes_inputs:
         summary, rows, calibration = summarize(keystrokes_input)
         summaries.append(summary)
+        joint_rows += [
+            {
+                "session_dir": summary["session_dir"],
+                "source": source, "effect": effect, "outcome": outcome,
+                "count": count,
+            }
+            for (source, effect, outcome), count in joint_counts(rows).items()
+        ]
         processed_path = args.labeled_out or os.path.join(
             args.out_dir, f"{summary['session_dir']}_processed.csv"
         )
@@ -804,6 +849,13 @@ def main(argv=None):
     if args.out:
         _write_csv(args.out, SUMMARY_FIELDS, summaries)
         summary_paths.append(args.out)
+    if args.joint_out:
+        _write_csv(
+            args.joint_out,
+            ["session_dir", "source", "effect", "outcome", "count"],
+            joint_rows,
+        )
+        summary_paths.append(args.joint_out)
 
     for path in written:
         print(f"processed -> {path}")
