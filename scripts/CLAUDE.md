@@ -55,10 +55,20 @@ python3 scripts/substitution_metrics.py sessions_raw/*_keystrokes.csv
 produces, in `processed-keystrokes/`:
 - `<session>_processed.csv` — every original column plus the label columns
 - `<session>_summary.md` — vertical markdown: raw behaviour counts (inserts,
-  backspaces, whole-selection deletes), then one block per mechanism with its
-  purposes (effects) and fates (outcomes) indented, then the session's gap
-  calibration (ADR 0004). `--out FILE.csv` adds one combined machine-readable
-  CSV row per session for cross-session stats.
+  backspaces, whole-selection deletes), one block per mechanism with its
+  purposes (effects) and fates (outcomes) indented, an `## episodes` section
+  pairing the three axes per substitution with the observed strings
+  (`day → say`; reverted rows quote the replayed `episode_final`, printed only
+  when `episode_final_trusted`), the session's gap calibration (ADR 0004), and
+  a label-definitions glossary. Data lines carry only counts and strings from
+  the session itself. `--out FILE.csv` adds one combined machine-readable
+  CSV row per session for cross-session stats; `--joint-out FILE.csv` writes
+  the episode counts in long format (`session_dir, source, effect, outcome,
+  count`).
+
+**Summaries quote participant text.** The observed strings are free-typed
+content, so treat `processed-keystrokes/` summaries with the same care as
+`sessions_raw/` exports.
 
 Every output is named after its session, so processing a new trial never
 overwrites an earlier one; re-running the **same** session regenerates its two

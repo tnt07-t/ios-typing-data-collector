@@ -503,6 +503,67 @@ def test_episode_section_pairs_the_three_axes(tmp_path):
     assert len(rows) == 2
 
 
+def test_episode_lines_quote_observed_strings(tmp_path):
+    # kept quotes the raw pair; reverted quotes the replayed end state;
+    # an untrusted region prints nothing - the count stands alone.
+    rows = [
+        (0, "insert", "", "i", 0, 0, 1, 0, 0, 0),
+        (500, "replace", "i", "I", 0, 1, 1, 500, 0, 0),         # kept
+        (600, "insert", "", " teh", 1, 0, 5, 100, 0, 0),
+        (1500, "replace", "teh", "the", 2, 3, 5, 900, 0, 0),    # reverted -> tea
+        (2100, "delete", "e", "", 4, 1, 4, 600, 0, 0),
+        (2200, "delete", "h", "", 3, 1, 3, 100, 0, 0),
+        (2300, "delete", "t", "", 2, 1, 2, 100, 0, 0),
+        (2400, "insert", "", "t", 2, 0, 3, 100, 0, 0),
+        (2500, "insert", "", "e", 3, 0, 4, 100, 0, 0),
+        (2600, "insert", "", "a", 4, 0, 5, 100, 0, 0),
+    ]
+    session = write_keystrokes_csv(tmp_path, rows)
+    out_dir = tmp_path / "out"
+    sm.main([str(session), "--out-dir", str(out_dir)])
+    text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
+    assert "- autocorrect · capitalization · kept: 1" in text
+    assert "    i → I" in text
+    assert "- autocorrect · spelling · reverted_other: 1" in text
+    assert "    teh → tea" in text
+
+
+def test_untrusted_region_prints_count_only(tmp_path):
+    # Trailing-burst region: the joint line appears, no string under it.
+    rows = [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (2100, "delete", "e", "", 2, 1, 2, 1200, 0, 0),
+        (2200, "delete", "h", "", 1, 1, 1, 100, 0, 0),
+        (2300, "delete", "t", "", 0, 1, 0, 100, 0, 0),
+    ]
+    for offset, char in enumerate("teh is fine"):
+        rows.append((2400 + offset * 100, "insert", "", char, offset, 0, offset + 1, 100, 0, 0))
+    session = write_keystrokes_csv(tmp_path, rows)
+    out_dir = tmp_path / "out"
+    sm.main([str(session), "--out-dir", str(out_dir)])
+    text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
+    assert "- autocorrect · spelling · reverted_other: 1" in text
+    assert "teh is fine" not in text
+
+
+def test_repeated_pairs_dedupe_with_a_multiplier(tmp_path):
+    rows = []
+    position = 0
+    for n in range(3):
+        t = n * 2000
+        rows.append((t, "insert", "", "i", position, 0, position + 1, 100, 0, 0))
+        rows.append((t + 500, "replace", "i", "I", position, 1, position + 1, 500, 0, 0))
+        rows.append((t + 600, "insert", "", " ", position + 1, 0, position + 2, 100, 0, 0))
+        position += 2
+    session = write_keystrokes_csv(tmp_path, rows)
+    out_dir = tmp_path / "out"
+    sm.main([str(session), "--out-dir", str(out_dir)])
+    text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
+    assert "- autocorrect · capitalization · kept: 3" in text
+    assert "    i → I  (×3)" in text
+
+
 def test_summary_definitions_live_in_one_glossary_block(tmp_path):
     # A definition printed inline next to a count reads as observed data (the
     # hardcoded "coler -> cooler" illustration was taken for a session finding

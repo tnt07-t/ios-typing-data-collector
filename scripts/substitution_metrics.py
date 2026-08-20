@@ -706,6 +706,36 @@ def joint_counts(rows):
     return {key: counts[key] for key in sorted(counts, key=rank)}
 
 
+# Distinct pairs listed under one episode line before eliding the rest.
+EPISODE_PAIRS_SHOWN = 6
+
+
+def _episode_pair(row):
+    """Printable `before -> after` strings for one episode, or None.
+
+    Only reverted rows have a replayed end state, so the pair's source
+    depends on the outcome: kept/edited_after quote the raw columns - what
+    iOS did, which for edited_after is *not* where the text ended up, hence
+    the annotation - and reverted rows quote `episode_final`, only when
+    trusted. Deriving an end state for edited_after by scanning owned
+    characters was rejected: user-inserted characters carry no owner and
+    would be silently spliced out.
+    """
+    outcome = row["substitution_outcome"]
+    old = row.get("replaced_text") or "(empty)"
+    if outcome == "kept":
+        return f"{old} → {row.get('replacement_text') or '(empty)'}"
+    if outcome == "edited_after":
+        return (
+            f"{old} → {row.get('replacement_text') or '(empty)'}"
+            "  (user edited it further)"
+        )
+    if outcome in ("reverted_to_original", "reverted_other"):
+        if row["episode_final"] and row["episode_final_trusted"] == "1":
+            return f"{old} → {row['episode_final']}"
+    return None
+
+
 def write_summary_md(summary, rows, calibration, path):
     """Per-session summary as vertical markdown: one block per mechanism,
     its purposes (effects) and fates (outcomes) as indented lines, then the
@@ -749,9 +779,28 @@ def write_summary_md(summary, rows, calibration, path):
             lines.append(f"  - grey-zone rows: {grey}")
     lines.append("")
     lines.append("## episodes")
-    for (source, effect, outcome), count in joint_counts(subs).items():
+    pairs_by_key = {}
+    for row in subs:
+        key = (
+            row["substitution_source"],
+            row["substitution_effect"],
+            row["substitution_outcome"] or "(not resolved)",
+        )
+        pair = _episode_pair(row)
+        if pair:
+            counts = pairs_by_key.setdefault(key, {})
+            counts[pair] = counts.get(pair, 0) + 1
+    for key, count in joint_counts(subs).items():
+        source, effect, outcome = key
         heading = SOURCE_HEADINGS.get(source, source)
         lines.append(f"- {heading} · {effect} · {outcome}: {count}")
+        pairs = pairs_by_key.get(key, {})
+        for shown, (pair, times) in enumerate(pairs.items()):
+            if shown == EPISODE_PAIRS_SHOWN:
+                lines.append(f"    … and {len(pairs) - shown} more")
+                break
+            suffix = f"  (×{times})" if times > 1 else ""
+            lines.append(f"    {pair}{suffix}")
     lines.append("")
     lines.append("## calibration")
     lines.append(
