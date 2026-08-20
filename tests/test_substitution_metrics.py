@@ -201,6 +201,7 @@ def test_paste_rows_are_classified_like_replaces(tmp_path):
     ("i", "I", "capitalization"),
     ("Lol", "lol", "capitalization"),
     ("'", "’", "punctuation"),
+    (" ", ". ", "punctuation"),   # double-space period
     ("its", "it's", "contraction"),
     ("ithacas", "Ithaca's", "contraction"),
     ("act", "actually", "completion"),
@@ -211,6 +212,20 @@ def test_paste_rows_are_classified_like_replaces(tmp_path):
 ])
 def test_classify_effect(old, new, effect):
     assert sm._classify_effect(old, new) == effect
+
+
+def test_double_space_period_is_punctuation(tmp_path):
+    # iOS logs the double-space shortcut as ` ` -> `. `. The flanking spaces
+    # fail _is_punctuation on both sides, which used to read as a phantom
+    # spelling correction in the summary.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "hi", 0, 0, 2, 0, 0, 0),
+        (500, "insert", "", " ", 2, 0, 3, 500, 0, 0),
+        (700, "replace", " ", ". ", 2, 1, 4, 200, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[2]["substitution_effect"] == "punctuation"
+    assert rows[2]["substitution_source"] == "autocorrect_engine"
 
 
 def test_untouched_substitution_is_kept(tmp_path):

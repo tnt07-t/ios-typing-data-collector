@@ -183,9 +183,10 @@ records `gap_threshold_ms`, `gap_calibration` (`anchored` / `anchored_high` /
 
 `substitution_effect`, first match wins (multi-effect rows take the earlier
 label): `capitalization` (same ignoring case), `punctuation` (both sides
-punctuation), `contraction` (stripping apostrophes/quotes from new gives old),
-`completion` (extends), `spacing` (equal ignoring whitespace), `spelling`
-(both non-empty), `other`.
+punctuation, or non-empty whitespace rewritten as punctuation — the
+double-space period arrives as ` ` → `. `), `contraction` (stripping
+apostrophes/quotes from new gives old), `completion` (extends), `spacing`
+(equal ignoring whitespace), `spelling` (both non-empty), `other`.
 
 `substitution_outcome`, from replaying the session's edit script and tracking
 each substituted span: `kept` (untouched to end of session),

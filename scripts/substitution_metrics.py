@@ -415,6 +415,13 @@ def _classify_effect(old, new):
         return "capitalization"
     if _is_punctuation(old) and _is_punctuation(new):
         return "punctuation"
+    # The double-space period arrives as ` ` -> `. `; the flanking spaces fail
+    # _is_punctuation on both sides, so without this it reads as a phantom
+    # spelling correction. `old` truthy on purpose: an empty replaced_text (a
+    # paste or completion of punctuation into nothing) keeps its label - only
+    # whitespace rewritten as punctuation is claimed.
+    if old and old.strip() == "" and _is_punctuation(new.strip()):
+        return "punctuation"
     unmarked = "".join(char for char in new if char not in CONTRACTION_MARKS)
     if old and unmarked != new and unmarked.lower() == old.lower():
         return "contraction"
@@ -664,7 +671,7 @@ SOURCE_DEFS = {
 }
 EFFECT_DEFS = {
     "capitalization": "case change only (i → I)",
-    "punctuation": "punctuation swapped (' → ’)",
+    "punctuation": "punctuation swapped (' → ’) or written over a space (double-space → '. ')",
     "contraction": "apostrophe added (its → it's)",
     "completion": "typed prefix extended (act → actually)",
     "spacing": "space added/removed",

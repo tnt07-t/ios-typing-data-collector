@@ -48,7 +48,7 @@
   - unknown: *no rule matched*
 - effect:
   - capitalization: *case change only (i → I)*
-  - punctuation: *punctuation swapped (' → ’)*
+  - punctuation: *punctuation swapped (' → ’) or written over a space (double-space → '. ')*
   - contraction: *apostrophe added (its → it's)*
   - completion: *typed prefix extended (act → actually)*
   - spacing: *space added/removed*
