@@ -282,6 +282,130 @@ def test_deleting_without_retyping_is_reverted_other(tmp_path):
     assert rows[1]["substitution_outcome"] == "reverted_other"
 
 
+def test_episode_final_captured_when_settled_mid_replay(tmp_path):
+    # The Jimmy_test_Tran row-167 shape: select `day`, overtype `d`, rebuild
+    # `day`, delete it all, type `say`, then edit elsewhere (settles the
+    # region). A preceding word keeps the elsewhere-edit outside [lo, hi).
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "hi ", 0, 0, 3, 0, 0, 0),
+        (500, "insert", "", "day", 3, 0, 6, 500, 0, 0),
+        (1000, "replace", "day", "d", 3, 3, 4, 500, 3, 0),
+        (1200, "insert", "", "a", 4, 0, 5, 200, 0, 0),
+        (1400, "insert", "", "y", 5, 0, 6, 200, 0, 0),
+        (2000, "delete", "", "", 5, 1, 5, 600, 0, 0),
+        (2200, "delete", "", "", 4, 1, 4, 200, 0, 0),
+        (2400, "delete", "", "", 3, 1, 3, 200, 0, 0),
+        (2600, "insert", "", "s", 3, 0, 4, 200, 0, 0),
+        (2800, "insert", "", "a", 4, 0, 5, 200, 0, 0),
+        (3000, "insert", "", "y", 5, 0, 6, 200, 0, 0),
+        (4000, "insert", "", "x", 0, 0, 7, 1000, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[2]["substitution_outcome"] == "reverted_other"
+    assert rows[2]["episode_final"] == "say"
+    assert rows[2]["episode_final_trusted"] == "1"
+
+
+def test_episode_final_captured_at_clean_session_end(tmp_path):
+    # Same shape as the reverted_other test above: the region settles at
+    # finalize with a sound buffer, so its content is still trustworthy.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (2100, "delete", "e", "", 2, 1, 2, 1200, 0, 0),
+        (2200, "delete", "h", "", 1, 1, 1, 100, 0, 0),
+        (2300, "delete", "t", "", 0, 1, 0, 100, 0, 0),
+        (2400, "insert", "", "t", 0, 0, 1, 100, 0, 0),
+        (2500, "insert", "", "e", 1, 0, 2, 100, 0, 0),
+        (2600, "insert", "", "a", 2, 0, 3, 100, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["episode_final"] == "tea"
+    assert rows[1]["episode_final_trusted"] == "1"
+
+
+def test_trailing_burst_region_is_untrusted(tmp_path):
+    # Retype the original and keep typing contiguously: `start == hi` edits
+    # are absorbed, so the region swallows the trailing text. The space it
+    # picks up appears in neither side of the pair -> untrusted, unprintable.
+    rows = [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (905, "insert", "", " ", 3, 0, 4, 5, 0, 0),
+        (2000, "delete", "", "", 3, 1, 3, 1095, 0, 0),
+        (2100, "delete", "", "", 2, 1, 2, 100, 0, 0),
+        (2200, "delete", "", "", 1, 1, 1, 100, 0, 0),
+        (2300, "delete", "", "", 0, 1, 0, 100, 0, 0),
+    ]
+    for offset, char in enumerate("teh is fine"):
+        rows.append((2400 + offset * 100, "insert", "", char, offset, 0, offset + 1, 100, 0, 0))
+    session = write_keystrokes_csv(tmp_path, rows)
+    labelled = classified(session)
+    assert labelled[1]["substitution_outcome"] == "reverted_other"
+    assert labelled[1]["episode_final"] == "teh is fine"
+    assert labelled[1]["episode_final_trusted"] == "0"
+
+
+def test_delimiter_from_the_pair_itself_stays_trusted(tmp_path):
+    # `alot -> a lot` reverted to exactly `a lot`: the space is in the pair,
+    # so a bare contains-a-delimiter rule would falsely suppress it.
+    rows = [
+        (0, "insert", "", "alot", 0, 0, 4, 0, 0, 0),
+        (900, "replace", "alot", "a lot", 0, 4, 5, 900, 0, 0),
+    ]
+    t = 2000
+    for n in range(5):
+        rows.append((t, "delete", "", "", 4 - n, 1, 4 - n, 100, 0, 0))
+        t += 100
+    for offset, char in enumerate("a lot"):
+        rows.append((t, "insert", "", char, offset, 0, offset + 1, 100, 0, 0))
+        t += 100
+    session = write_keystrokes_csv(tmp_path, rows)
+    labelled = classified(session)
+    assert labelled[1]["substitution_outcome"] == "reverted_other"
+    assert labelled[1]["episode_final"] == "a lot"
+    assert labelled[1]["episode_final_trusted"] == "1"
+
+
+def test_kept_and_edited_after_have_no_episode_final(tmp_path):
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),   # kept
+        (1000, "insert", "", " ", 3, 0, 4, 100, 0, 0),
+        (1100, "insert", "", "teh", 4, 0, 7, 100, 0, 0),
+        (1900, "replace", "teh", "they", 4, 3, 8, 800, 0, 0),  # edited_after
+        (3000, "delete", "y", "", 7, 1, 7, 1100, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[1]["substitution_outcome"] == "kept"
+    assert rows[1]["episode_final"] == ""
+    assert rows[1]["episode_final_trusted"] == ""
+    assert rows[4]["substitution_outcome"] == "edited_after"
+    assert rows[4]["episode_final"] == ""
+    assert rows[4]["episode_final_trusted"] == ""
+
+
+def test_region_settled_at_divergence_drops_its_final_string(tmp_path, capsys):
+    # Collapse and retype, then a row whose range_start is beyond the replayed
+    # text: partial finalize. The outcome survives; the region string would
+    # quote a buffer known to be out of sync, so it is dropped.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (2100, "delete", "e", "", 2, 1, 2, 1200, 0, 0),
+        (2200, "delete", "h", "", 1, 1, 1, 100, 0, 0),
+        (2300, "delete", "t", "", 0, 1, 0, 100, 0, 0),
+        (2400, "insert", "", "tea", 0, 0, 3, 100, 0, 0),
+        (2500, "insert", "", "x", 9, 0, 10, 100, 0, 0),      # diverges
+    ])
+    rows = classified(session)
+    assert "diverged" in capsys.readouterr().err
+    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["episode_final"] == ""
+    assert rows[1]["episode_final_trusted"] == ""
+
+
 def test_inconsistent_edit_script_leaves_outcomes_empty(tmp_path, capsys):
     # range_start beyond the replayed text: replay diverged, outcomes must not
     # be guessed. Source and effect are unaffected.

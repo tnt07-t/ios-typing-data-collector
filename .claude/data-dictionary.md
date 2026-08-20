@@ -151,6 +151,8 @@ derived alias):
 | `revert_latency_ms` | ms until the user first touched the substituted span | certain; empty when `kept` |
 | `next_delimiter_gap_ms` | trailing delimiter gap backing the source label | measured; empty when no delimiter follows within 200 ms |
 | `substitution_kind` | legacy alias of source + effect | — |
+| `episode_final` | replayed end state of a reverted span (`day → d` deleted, `say` typed ⇒ `say`) | replayed; **reverted rows only** — `kept`/`edited_after` never collapse, their end state is `replacement_text`; empty when the replay diverged before settling |
+| `episode_final_trusted` | 1 when `episode_final` is safe to quote, 0 when the region grew past the episode | contaminated regions are detectable by content: they contain a whitespace/punctuation char found in neither `replaced_text` nor `replacement_text` (spacing/typography pairs legitimately carry their own delimiter) |
 
 `substitution_source` priority cascade:
 

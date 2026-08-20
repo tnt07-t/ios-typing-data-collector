@@ -77,6 +77,8 @@ LABEL_COLUMNS = [
     "revert_latency_ms",
     "next_delimiter_gap_ms",
     "substitution_kind",
+    "episode_final",
+    "episode_final_trusted",
 ]
 
 # A substitution fired by the keystroke that triggered it lands within a few
@@ -531,6 +533,7 @@ def _classify_outcomes(rows, keystrokes_path):
                 "t_ms": t_ms,
                 "original": row.get("replaced_text") or "",
                 "outcome": None,
+                "final": None,
             }
 
     _finalize_outcomes(rows, states, text, partial=False)
@@ -539,10 +542,15 @@ def _classify_outcomes(rows, keystrokes_path):
 def _finalize_outcomes(rows, states, text, partial):
     """Write the outcome columns. A partial finalize (replay diverged) keeps
     everything already resolved but cannot certify `kept` - an untouched span
-    stays unlabelled rather than guessed."""
+    stays unlabelled rather than guessed, and a region settled against the
+    diverged buffer keeps its outcome (any content difference still proves a
+    revert) but drops its `final` string, which would quote a buffer known to
+    be out of sync."""
     for index, state in states.items():
         if state["phase"] == "collapsed":
             _settle(state, text)
+            if partial:
+                state["final"] = None
         if state["outcome"] is not None:
             outcome = state["outcome"]
         elif state["touched"]:
@@ -555,13 +563,47 @@ def _finalize_outcomes(rows, states, text, partial):
         if outcome and outcome != "kept" and state["touched_t_ms"] is not None and state["t_ms"] is not None:
             rows[index]["revert_latency_ms"] = f"{state['touched_t_ms'] - state['t_ms']:.3f}"
 
+        # The replayed end state exists only for reverted rows: `kept` and
+        # `edited_after` never collapse, so they have no region at all - their
+        # end state is the raw `replacement_text` (annotated for edited_after
+        # by consumers), never derived here.
+        final = state.get("final")
+        if outcome in ("reverted_to_original", "reverted_other") and final is not None:
+            rows[index]["episode_final"] = final
+            rows[index]["episode_final_trusted"] = str(
+                _episode_trust(
+                    final,
+                    state["original"],
+                    rows[index].get("replacement_text") or "",
+                )
+            )
+
 
 def _settle(state, text):
     region = "".join(char for char, _ in text[state["lo"] : state["hi"]])
     state["outcome"] = (
         "reverted_to_original" if region == state["original"] else "reverted_other"
     )
+    state["final"] = region
     state["phase"] = "settled"
+
+
+def _episode_trust(final, old, new):
+    """1 when the settled region is safe to print as the episode's end state.
+
+    The only way a region lies is by growing: `start == hi` edits are absorbed,
+    so contiguous typing after a revert drags trailing text in. Growth is
+    detectable from the string - it crosses a word boundary the substitution
+    pair never had. Judged against the pair, not by mere delimiter presence:
+    spacing substitutions (`alot` -> `a lot`) and smart-typography reverts
+    legitimately contain the delimiter that is the whole point of the row.
+    """
+    allowed = set(old) | set(new)
+    contaminated = any(
+        (char.isspace() or char in PUNCTUATION) and char not in allowed
+        for char in final
+    )
+    return 0 if contaminated else 1
 
 
 def _warn_diverged(rows, keystrokes_path, index):
