@@ -480,10 +480,23 @@ def _classify_outcomes(rows, keystrokes_path):
             return
 
         # An edit outside a collapsed region means the retyping burst there is
-        # over: settle it on the text as it stands.
+        # over: settle it on the text as it stands. Two refinements (ADR 0005):
+        # an *empty* region is not settled by an edit elsewhere - the user has
+        # deleted but not yet replaced, and settling would bake in "left
+        # nothing" on interrupted reverts where they come back and retype -
+        # and a new substitution firing *inside* a region ends that episode as
+        # it stands (the fight-with-autocorrect: delete `the`, retype `teh`,
+        # autocorrect re-fires - the first episode's end state is `teh`).
         for state in states.values():
-            if state["phase"] == "collapsed" and not (
-                state["lo"] <= start <= state["hi"]
+            if state["phase"] != "collapsed":
+                continue
+            if not (state["lo"] <= start <= state["hi"]):
+                if state["lo"] < state["hi"]:
+                    _settle(state, text)
+            elif (
+                event in ("replace", "paste")
+                and start <= state["hi"]
+                and start + length >= state["lo"]
             ):
                 _settle(state, text)
 
@@ -520,7 +533,20 @@ def _classify_outcomes(rows, keystrokes_path):
         delta = len(replacement) - length
         for sub_index, state in states.items():
             if state["phase"] == "collapsed":
-                if start <= state["hi"] and start + length >= state["lo"]:
+                # Appending a delimiter the substitution pair never had means
+                # the retyping burst walked past the episode: settle on the
+                # region as it stood before this insert (lo/hi are unchanged
+                # by an append at hi, so the region excludes it) instead of
+                # absorbing trailing text without bound (ADR 0005).
+                if (
+                    start == state["hi"]
+                    and length == 0
+                    and _has_foreign_delimiter(replacement, state["pair_chars"])
+                ):
+                    # The append shifts only indices >= hi, so text[lo:hi]
+                    # already excludes the delimiter just inserted.
+                    _settle(state, text)
+                elif start <= state["hi"] and start + length >= state["lo"]:
                     state["lo"] = min(state["lo"], start)
                     state["hi"] = max(state["lo"], state["hi"] + delta)
                 elif start + length <= state["lo"]:
@@ -539,6 +565,8 @@ def _classify_outcomes(rows, keystrokes_path):
                 "touched_t_ms": None,
                 "t_ms": t_ms,
                 "original": row.get("replaced_text") or "",
+                "pair_chars": set(row.get("replaced_text") or "")
+                | set(replacement),
                 "outcome": None,
                 "final": None,
             }
@@ -595,22 +623,28 @@ def _settle(state, text):
     state["phase"] = "settled"
 
 
+def _has_foreign_delimiter(piece, pair_chars):
+    """A whitespace/punctuation char the substitution pair never had marks a
+    word boundary that is not part of the episode. Judged against the pair,
+    not by mere delimiter presence: spacing substitutions (`alot` -> `a lot`)
+    and smart-typography reverts legitimately contain the delimiter that is
+    the whole point of the row."""
+    return any(
+        (char.isspace() or char in PUNCTUATION) and char not in pair_chars
+        for char in piece
+    )
+
+
 def _episode_trust(final, old, new):
     """1 when the settled region is safe to print as the episode's end state.
 
-    The only way a region lies is by growing: `start == hi` edits are absorbed,
-    so contiguous typing after a revert drags trailing text in. Growth is
-    detectable from the string - it crosses a word boundary the substitution
-    pair never had. Judged against the pair, not by mere delimiter presence:
-    spacing substitutions (`alot` -> `a lot`) and smart-typography reverts
-    legitimately contain the delimiter that is the whole point of the row.
+    The only way a region lies is by growing into neighbouring text; growth
+    that crossed a word boundary is detectable from the string itself. Growth
+    by contiguous appending settles at the boundary instead (ADR 0005), so
+    this flags the remaining vectors: overlap edits that widen the region and
+    delimiters typed inside it.
     """
-    allowed = set(old) | set(new)
-    contaminated = any(
-        (char.isspace() or char in PUNCTUATION) and char not in allowed
-        for char in final
-    )
-    return 0 if contaminated else 1
+    return 0 if _has_foreign_delimiter(final, set(old) | set(new)) else 1
 
 
 def _warn_diverged(rows, keystrokes_path, index):

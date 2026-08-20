@@ -340,10 +340,10 @@ def test_episode_final_captured_at_clean_session_end(tmp_path):
     assert rows[1]["episode_final_trusted"] == "1"
 
 
-def test_trailing_burst_region_is_untrusted(tmp_path):
-    # Retype the original and keep typing contiguously: `start == hi` edits
-    # are absorbed, so the region swallows the trailing text. The space it
-    # picks up appears in neither side of the pair -> untrusted, unprintable.
+def test_trailing_burst_settles_at_the_foreign_delimiter(tmp_path):
+    # Retype the original and keep typing contiguously. Appending a delimiter
+    # the pair never had ends the episode there (ADR 0005), so the region is
+    # `teh`, not `teh is fine` - and the outcome is the revert it really was.
     rows = [
         (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
         (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
@@ -357,9 +357,58 @@ def test_trailing_burst_region_is_untrusted(tmp_path):
         rows.append((2400 + offset * 100, "insert", "", char, offset, 0, offset + 1, 100, 0, 0))
     session = write_keystrokes_csv(tmp_path, rows)
     labelled = classified(session)
-    assert labelled[1]["substitution_outcome"] == "reverted_other"
-    assert labelled[1]["episode_final"] == "teh is fine"
-    assert labelled[1]["episode_final_trusted"] == "0"
+    assert labelled[1]["substitution_outcome"] == "reverted_to_original"
+    assert labelled[1]["episode_final"] == "teh"
+    assert labelled[1]["episode_final_trusted"] == "1"
+
+
+def test_autocorrect_refire_ends_the_first_episode_at_the_retype(tmp_path):
+    # The fight: teh -> the, delete, retype teh, space -> autocorrect fires
+    # again. The second replace lands inside the first episode's region; the
+    # first episode settles as it stood (`teh` == original) instead of
+    # absorbing the second substitution's output.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
+        (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (905, "insert", "", " ", 3, 0, 4, 5, 0, 0),
+        (2000, "delete", "", "", 3, 1, 3, 1095, 0, 0),
+        (2100, "delete", "", "", 2, 1, 2, 100, 0, 0),
+        (2200, "delete", "", "", 1, 1, 1, 100, 0, 0),
+        (2300, "delete", "", "", 0, 1, 0, 100, 0, 0),
+        (2400, "insert", "", "t", 0, 0, 1, 100, 0, 0),
+        (2500, "insert", "", "e", 1, 0, 2, 100, 0, 0),
+        (2600, "insert", "", "h", 2, 0, 3, 100, 0, 0),
+        (3500, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
+        (3505, "insert", "", " ", 3, 0, 4, 5, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[1]["substitution_outcome"] == "reverted_to_original"
+    assert rows[1]["episode_final"] == "teh"
+    assert rows[1]["episode_final_trusted"] == "1"
+    assert rows[10]["substitution_outcome"] == "kept"
+
+
+def test_interrupted_revert_survives_an_edit_elsewhere(tmp_path):
+    # Delete the corrected word, fix a typo earlier in the text, come back
+    # and retype the original. The elsewhere edits must not settle the empty
+    # region as "left nothing" - it shifts with the edits and stays alive.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "xy ", 0, 0, 3, 0, 0, 0),
+        (500, "insert", "", "teh", 3, 0, 6, 500, 0, 0),
+        (1400, "replace", "teh", "the", 3, 3, 6, 900, 0, 0),
+        (2000, "delete", "", "", 5, 1, 5, 600, 0, 0),
+        (2100, "delete", "", "", 4, 1, 4, 100, 0, 0),
+        (2200, "delete", "", "", 3, 1, 3, 100, 0, 0),
+        (3000, "delete", "", "", 1, 1, 2, 800, 0, 0),     # fix xy -> xz
+        (3200, "insert", "", "z", 1, 0, 3, 200, 0, 0),
+        (4000, "insert", "", "t", 3, 0, 4, 800, 0, 0),    # back: retype teh
+        (4100, "insert", "", "e", 4, 0, 5, 100, 0, 0),
+        (4200, "insert", "", "h", 5, 0, 6, 100, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[2]["substitution_outcome"] == "reverted_to_original"
+    assert rows[2]["episode_final"] == "teh"
+    assert rows[2]["episode_final_trusted"] == "1"
 
 
 def test_delimiter_from_the_pair_itself_stays_trusted(tmp_path):
@@ -544,22 +593,25 @@ def test_episode_lines_quote_observed_strings(tmp_path):
 
 
 def test_untrusted_region_prints_count_only(tmp_path):
-    # Trailing-burst region: the joint line appears, no string under it.
-    rows = [
+    # A foreign delimiter typed *inside* the region is absorbed (only appends
+    # at hi settle), so the region still carries it - untrusted, and the
+    # joint line appears with no string under it.
+    session = write_keystrokes_csv(tmp_path, [
         (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
         (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
         (2100, "delete", "e", "", 2, 1, 2, 1200, 0, 0),
         (2200, "delete", "h", "", 1, 1, 1, 100, 0, 0),
         (2300, "delete", "t", "", 0, 1, 0, 100, 0, 0),
-    ]
-    for offset, char in enumerate("teh is fine"):
-        rows.append((2400 + offset * 100, "insert", "", char, offset, 0, offset + 1, 100, 0, 0))
-    session = write_keystrokes_csv(tmp_path, rows)
+        (2400, "insert", "", "t", 0, 0, 1, 100, 0, 0),
+        (2500, "insert", "", "e", 1, 0, 2, 100, 0, 0),
+        (2600, "insert", "", "a", 2, 0, 3, 100, 0, 0),
+        (2700, "insert", "", ".", 1, 0, 4, 100, 0, 0),   # inside the region
+    ])
     out_dir = tmp_path / "out"
     sm.main([str(session), "--out-dir", str(out_dir)])
     text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
     assert "- autocorrect · spelling · reverted_other: 1" in text
-    assert "teh is fine" not in text
+    assert "t.ea" not in text
 
 
 def test_repeated_pairs_dedupe_with_a_multiplier(tmp_path):
