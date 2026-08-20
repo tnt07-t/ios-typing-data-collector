@@ -53,7 +53,13 @@ EFFECTS = [
     "spelling",
     "other",
 ]
-OUTCOMES = ["kept", "reverted_to_original", "reverted_other", "edited_after"]
+OUTCOMES = [
+    "kept",
+    "reverted_to_original",
+    "replaced_with_other",
+    "deleted_entirely",
+    "edited_after",
+]
 
 SUMMARY_FIELDS = (
     ["session_dir", "keystroke_rows", "substitution_rows"]
@@ -459,7 +465,8 @@ def _classify_outcomes(rows, keystrokes_path):
     A span whose tagged characters are all gone collapses to a region that
     absorbs the consecutive retyping at that spot; once activity moves
     elsewhere (or the session ends) the region settles and its content decides
-    `reverted_to_original` vs `reverted_other`. Touched but never fully
+    `reverted_to_original` / `replaced_with_other` / `deleted_entirely`.
+    Touched but never fully
     removed is `edited_after`; untouched to the end is `kept`.
     """
     text = []  # one [char, owner] per character; owner = substitution row index
@@ -603,7 +610,7 @@ def _finalize_outcomes(rows, states, text, partial):
         # end state is the raw `replacement_text` (annotated for edited_after
         # by consumers), never derived here.
         final = state.get("final")
-        if outcome in ("reverted_to_original", "reverted_other") and final is not None:
+        if outcome in ("reverted_to_original", "replaced_with_other", "deleted_entirely") and final is not None:
             rows[index]["episode_final"] = final
             rows[index]["episode_final_trusted"] = str(
                 _episode_trust(
@@ -616,9 +623,14 @@ def _finalize_outcomes(rows, states, text, partial):
 
 def _settle(state, text):
     region = "".join(char for char, _ in text[state["lo"] : state["hi"]])
-    state["outcome"] = (
-        "reverted_to_original" if region == state["original"] else "reverted_other"
-    )
+    # Original before empty: a paste over an empty replaced_text that is
+    # deleted again restored the original (nothing), not "deleted entirely".
+    if region == state["original"]:
+        state["outcome"] = "reverted_to_original"
+    elif region == "":
+        state["outcome"] = "deleted_entirely"
+    else:
+        state["outcome"] = "replaced_with_other"
     state["final"] = region
     state["phase"] = "settled"
 
@@ -715,7 +727,8 @@ EFFECT_DEFS = {
 OUTCOME_DEFS = {
     "kept": "user never touched it again",
     "reverted_to_original": "user deleted it and retyped exactly what they had",
-    "reverted_other": "user deleted it and put something else (or nothing)",
+    "replaced_with_other": "user deleted it and typed something else",
+    "deleted_entirely": "user deleted it and left nothing",
     "edited_after": "user changed it but did not remove it",
     "(not resolved)": "session log had a gap; not certifiable",
 }
@@ -771,7 +784,7 @@ def _episode_pair(row):
             f"{old} → {row.get('replacement_text') or '(empty)'}"
             "  (user edited it further)"
         )
-    if outcome in ("reverted_to_original", "reverted_other"):
+    if outcome in ("reverted_to_original", "replaced_with_other", "deleted_entirely"):
         if row["episode_final"] and row["episode_final_trusted"] == "1":
             return f"{old} → {row['episode_final']}"
     return None

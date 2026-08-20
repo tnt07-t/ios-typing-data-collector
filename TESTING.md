@@ -21,7 +21,7 @@ deliberately include each of these, ~5–10 times each:
 | Select + overtype | double-tap a word to select it, type a new word over it | manual overtype |
 | Select + delete | double-tap a word, hit backspace | (behaviour count: whole-selection delete) |
 | Revert a correction | let autocorrect change a word, then backspace it and retype **exactly** what you originally typed | outcome: reverted_to_original |
-| Revert differently | let it correct, delete it, type a different word | outcome: reverted_other |
+| Revert differently | let it correct, delete it, type a different word | outcome: replaced_with_other |
 | Leave corrections alone | just keep typing after some corrections | outcome: kept |
 
 Autocorrect must be ON in Settings → General → Keyboard. If a session is

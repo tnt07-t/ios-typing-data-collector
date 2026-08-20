@@ -42,7 +42,8 @@ for why):
 - `substitution_effect` — what changed (`capitalization`, `punctuation`,
   `contraction`, `completion`, `spacing`, `spelling`, `other`); certain.
 - `substitution_outcome` + `revert_latency_ms` — what the user did about it
-  (`kept`, `reverted_to_original`, `reverted_other`, `edited_after`), by
+  (`kept`, `reverted_to_original`, `replaced_with_other`, `deleted_entirely`,
+  `edited_after`), by
   replaying the edit script; certain.
 - `substitution_kind` — legacy alias of source + effect (old flat enum).
 

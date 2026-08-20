@@ -57,7 +57,8 @@
 - outcome:
   - kept: *user never touched it again*
   - reverted_to_original: *user deleted it and retyped exactly what they had*
-  - reverted_other: *user deleted it and put something else (or nothing)*
+  - replaced_with_other: *user deleted it and typed something else*
+  - deleted_entirely: *user deleted it and left nothing*
   - edited_after: *user changed it but did not remove it*
   - (not resolved): *session log had a gap; not certifiable*
 - grey-zone rows: *timing ambiguous, review before trusting*

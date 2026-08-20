@@ -258,7 +258,7 @@ def test_deleting_and_retyping_the_original_is_reverted_to_original(tmp_path):
     assert rows[1]["revert_latency_ms"] == "1200.000"
 
 
-def test_deleting_and_retyping_something_else_is_reverted_other(tmp_path):
+def test_deleting_and_retyping_something_else_is_replaced_with_other(tmp_path):
     session = write_keystrokes_csv(tmp_path, [
         (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
         (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
@@ -270,7 +270,7 @@ def test_deleting_and_retyping_something_else_is_reverted_other(tmp_path):
         (2600, "insert", "", "a", 2, 0, 3, 100, 0, 0),
     ])
     rows = classified(session)
-    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["substitution_outcome"] == "replaced_with_other"
     assert rows[1]["revert_latency_ms"] == "1200.000"
 
 
@@ -285,7 +285,21 @@ def test_editing_inside_the_substituted_span_is_edited_after(tmp_path):
     assert rows[1]["revert_latency_ms"] == "1100.000"
 
 
-def test_deleting_without_retyping_is_reverted_other(tmp_path):
+def test_deleted_paste_over_nothing_is_reverted_to_original(tmp_path):
+    # A paste with empty replaced_text that the user deletes again restored
+    # the original (nothing): region == original must win over the empty
+    # test, or this would come out deleted_entirely.
+    session = write_keystrokes_csv(tmp_path, [
+        (0, "insert", "", "x ", 0, 0, 2, 0, 0, 0),
+        (900, "paste", "", "hi", 2, 0, 4, 900, 0, 0),
+        (2000, "delete", "", "", 3, 1, 3, 1100, 0, 0),
+        (2100, "delete", "", "", 2, 1, 2, 100, 0, 0),
+    ])
+    rows = classified(session)
+    assert rows[1]["substitution_outcome"] == "reverted_to_original"
+
+
+def test_deleting_without_retyping_is_deleted_entirely(tmp_path):
     session = write_keystrokes_csv(tmp_path, [
         (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
         (900, "replace", "teh", "the", 0, 3, 3, 900, 0, 0),
@@ -294,7 +308,7 @@ def test_deleting_without_retyping_is_reverted_other(tmp_path):
         (2300, "delete", "t", "", 0, 1, 0, 100, 0, 0),
     ])
     rows = classified(session)
-    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["substitution_outcome"] == "deleted_entirely"
 
 
 def test_episode_final_captured_when_settled_mid_replay(tmp_path):
@@ -316,13 +330,13 @@ def test_episode_final_captured_when_settled_mid_replay(tmp_path):
         (4000, "insert", "", "x", 0, 0, 7, 1000, 0, 0),
     ])
     rows = classified(session)
-    assert rows[2]["substitution_outcome"] == "reverted_other"
+    assert rows[2]["substitution_outcome"] == "replaced_with_other"
     assert rows[2]["episode_final"] == "say"
     assert rows[2]["episode_final_trusted"] == "1"
 
 
 def test_episode_final_captured_at_clean_session_end(tmp_path):
-    # Same shape as the reverted_other test above: the region settles at
+    # Same shape as the replaced_with_other test above: the region settles at
     # finalize with a sound buffer, so its content is still trustworthy.
     session = write_keystrokes_csv(tmp_path, [
         (0, "insert", "", "teh", 0, 0, 3, 0, 0, 0),
@@ -335,7 +349,7 @@ def test_episode_final_captured_at_clean_session_end(tmp_path):
         (2600, "insert", "", "a", 2, 0, 3, 100, 0, 0),
     ])
     rows = classified(session)
-    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["substitution_outcome"] == "replaced_with_other"
     assert rows[1]["episode_final"] == "tea"
     assert rows[1]["episode_final_trusted"] == "1"
 
@@ -427,7 +441,7 @@ def test_delimiter_from_the_pair_itself_stays_trusted(tmp_path):
         t += 100
     session = write_keystrokes_csv(tmp_path, rows)
     labelled = classified(session)
-    assert labelled[1]["substitution_outcome"] == "reverted_other"
+    assert labelled[1]["substitution_outcome"] == "replaced_with_other"
     assert labelled[1]["episode_final"] == "a lot"
     assert labelled[1]["episode_final_trusted"] == "1"
 
@@ -465,7 +479,7 @@ def test_region_settled_at_divergence_drops_its_final_string(tmp_path, capsys):
     ])
     rows = classified(session)
     assert "diverged" in capsys.readouterr().err
-    assert rows[1]["substitution_outcome"] == "reverted_other"
+    assert rows[1]["substitution_outcome"] == "replaced_with_other"
     assert rows[1]["episode_final"] == ""
     assert rows[1]["episode_final_trusted"] == ""
 
@@ -557,12 +571,12 @@ def test_episode_section_pairs_the_three_axes(tmp_path):
     text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
     assert "## episodes" in text
     assert "- autocorrect · capitalization · kept: 1" in text
-    assert "- autocorrect · spelling · reverted_other: 1" in text
+    assert "- autocorrect · spelling · deleted_entirely: 1" in text
     with joint.open(newline="", encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle))
     assert {
         "session_dir": "Alex,1,left,ac_on", "source": "autocorrect_engine",
-        "effect": "spelling", "outcome": "reverted_other", "count": "1",
+        "effect": "spelling", "outcome": "deleted_entirely", "count": "1",
     } in rows
     assert len(rows) == 2
 
@@ -588,7 +602,7 @@ def test_episode_lines_quote_observed_strings(tmp_path):
     text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
     assert "- autocorrect · capitalization · kept: 1" in text
     assert "    i → I" in text
-    assert "- autocorrect · spelling · reverted_other: 1" in text
+    assert "- autocorrect · spelling · replaced_with_other: 1" in text
     assert "    teh → tea" in text
 
 
@@ -610,7 +624,7 @@ def test_untrusted_region_prints_count_only(tmp_path):
     out_dir = tmp_path / "out"
     sm.main([str(session), "--out-dir", str(out_dir)])
     text = (out_dir / "Alex,1,left,ac_on_summary.md").read_text(encoding="utf-8")
-    assert "- autocorrect · spelling · reverted_other: 1" in text
+    assert "- autocorrect · spelling · replaced_with_other: 1" in text
     assert "t.ea" not in text
 
 

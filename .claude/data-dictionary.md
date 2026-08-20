@@ -191,8 +191,10 @@ apostrophes/quotes from new gives old), `completion` (extends), `spacing`
 `substitution_outcome`, from replaying the session's edit script and tracking
 each substituted span: `kept` (untouched to end of session),
 `reverted_to_original` (span deleted and the original text retyped),
-`reverted_other` (span deleted, something else — or nothing — in its place),
-`edited_after` (span modified but partly intact). If replay diverges from
+`replaced_with_other` (span deleted, different text in its place),
+`deleted_entirely` (span deleted, nothing in its place — only assigned at a
+foreign-delimiter close or session end, never by an unrelated mid-session
+edit; ADR 0005), `edited_after` (span modified but partly intact). If replay diverges from
 `resulting_text_length` on an unmarked row (a real capture gap — iOS edited
 text without a delegate callback), outcomes resolved before that point are
 kept and the rest stay empty; `kept` is never guessed. While
