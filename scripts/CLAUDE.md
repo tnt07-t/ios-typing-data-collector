@@ -115,6 +115,27 @@ reported separately. `final_text.txt`, when present, is preferred over replay;
 older exports fall back to a conservative replay that marks unlogged inline
 prediction text as unknown rather than inventing it.
 
+## FreeTypeRecorder per-word edit metrics
+
+`word_edit_metrics.py <keystrokes.csv ...> [--out-dir processed-keystrokes]`
+
+Purpose of the keystrokes.csv export: (1) compute typing performance metrics
+(CER/WER, per-word edit rates); (2) serve as behavioral ground truth for
+evaluating the adaptive (Gaussian) keyboard.
+
+Decides, for every word in the final text, one binary — edited or typed
+clean — and breaks edited words down by correction mechanism
+(`backspace_retype`, `autocorrect`, `suggestion_bar`, `inline_prediction`,
+`smart_typography`, `select_overtype`), reported as percentages of the word
+and character totals with observed examples. Backspace corrections have no
+substitution row, so this is the only report where manual self-correction
+appears as a category. Substitutions are attributed to the word holding
+their inserted characters; deletes carry a left-biased position marker
+shifted through later edits into final-text coordinates. Words deleted
+entirely are not in the denominator (see `deleted_entirely` outcomes).
+Outputs per session: `<session>_word_edits.csv`, `<session>_word_summary.md`
+— both quote participant text; handle like `sessions_raw/`.
+
 ## Outlier criteria (clean_keystrokes.py)
 `spatial` (norm outside [-0.5,1.5]), `far_from_target` (>1.25 kw), `iki_low` (<50ms,
 double-register), `iki_high` (>3000ms, pause), `trial_start`, `delete_event`,

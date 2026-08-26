@@ -56,7 +56,15 @@ thresholds used (e.g. `_cleaned_t1.0_s2.5.csv`).
 # Data Dictionary — FreeTypeRecorder Session Files
 
 A different app and schema from the TypingResearch export above. Free-typing
-sessions have no target word, so they have no correctness columns. One session
+sessions have no target word, so they have no correctness columns.
+
+Purpose of this export: (1) compute typing performance metrics (CER/WER via
+`scripts/prefix_error_metrics.py`, per-word edit rates via
+`scripts/word_edit_metrics.py`, substitution labels via
+`scripts/substitution_metrics.py`); (2) serve as behavioral ground truth for
+evaluating the adaptive (Gaussian) keyboard. Per-keystroke tap coordinates
+for Gaussian fitting are planned but not yet logged — the system keyboard's
+touches are not observable in-app (see `LastTouchTracker.swift`). One session
 directory (`Documents/Sessions/<hand>/<name>-<n>/`) contains:
 
 | File | Contents |
